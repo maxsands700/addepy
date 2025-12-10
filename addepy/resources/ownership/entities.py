@@ -1,4 +1,4 @@
-"""Entities and Entity Types resources for the Addepar API."""
+"""Entities resource for the Addepar API."""
 
 import json
 import logging
@@ -11,66 +11,11 @@ from ..base import BaseResource
 logger = logging.getLogger("addepy")
 
 
-class EntityTypesResource(BaseResource):
-    """
-    Resource for Addepar Entity Types (Model Types) API.
-
-    This is a read-only resource that provides metadata about available
-    entity types, including their ownership structure and required attributes.
-
-    Tier 1 (Read-only):
-        - get_entity_type() - Get a single model type by API name
-        - list_entity_types() - List all available model types
-    """
-
-    # =========================================================================
-    # Tier 1: Read-Only Methods
-    # =========================================================================
-
-    def get_entity_type(self, type_id: str) -> Dict[str, Any]:
-        """
-        Get a single model type by its API name.
-
-        Args:
-            type_id: The API name of the model type (e.g., "bond", "trust",
-                     "person_node", "financial_account").
-
-        Returns:
-            The model type resource object containing:
-                - display_name: Human-readable name
-                - category: Broad category classification
-                - ownership_type: Ownership structure (share_based, percent_based, value_based)
-                - entity_attributes: Dictionary of available attributes for this type
-        """
-        response = self._get(f"/entity_types/{type_id}")
-        data = response.json()
-        entity_type = data.get("data", {})
-        logger.debug(f"Retrieved entity type: {type_id}")
-        return entity_type
-
-    def list_entity_types(self) -> List[Dict[str, Any]]:
-        """
-        List all available model types.
-
-        Returns:
-            List of model type resource objects, each containing display_name,
-            category, ownership_type, and entity_attributes.
-
-        Note:
-            This endpoint does not support pagination.
-        """
-        response = self._get("/entity_types")
-        data = response.json()
-        entity_types = data.get("data", [])
-        logger.debug(f"Listed {len(entity_types)} entity types")
-        return entity_types
-
-
 class EntitiesResource(BaseResource):
     """
-    Resource for Addepar Entities API.
+    Resource for Addepar Entities and Entity Types API.
 
-    Tier 1 (CRUD wrappers):
+    Entities (CRUD):
         - get_entity() - Get a single entity by ID
         - list_entities() - List all entities with pagination and filtering
         - create_entity() - Create a single entity
@@ -79,6 +24,10 @@ class EntitiesResource(BaseResource):
         - update_entities() - Bulk update entities
         - delete_entity() - Delete a single entity
         - delete_entities() - Bulk delete entities
+
+    Entity Types (Read-only):
+        - get_entity_type() - Get a single model type by API name
+        - list_entity_types() - List all available model types
     """
 
     # =========================================================================
@@ -378,3 +327,45 @@ class EntitiesResource(BaseResource):
 
         self._delete("/entities", data=json.dumps(payload))
         logger.info(f"Deleted {len(entity_ids)} entities")
+
+    # =========================================================================
+    # Entity Types (Read-Only)
+    # =========================================================================
+
+    def get_entity_type(self, type_id: str) -> Dict[str, Any]:
+        """
+        Get a single model type by its API name.
+
+        Args:
+            type_id: The API name of the model type (e.g., "bond", "trust",
+                     "person_node", "financial_account").
+
+        Returns:
+            The model type resource object containing:
+                - display_name: Human-readable name
+                - category: Broad category classification
+                - ownership_type: Ownership structure (share_based, percent_based, value_based)
+                - entity_attributes: Dictionary of available attributes for this type
+        """
+        response = self._get(f"/entity_types/{type_id}")
+        data = response.json()
+        entity_type = data.get("data", {})
+        logger.debug(f"Retrieved entity type: {type_id}")
+        return entity_type
+
+    def list_entity_types(self) -> List[Dict[str, Any]]:
+        """
+        List all available model types.
+
+        Returns:
+            List of model type resource objects, each containing display_name,
+            category, ownership_type, and entity_attributes.
+
+        Note:
+            This endpoint does not support pagination.
+        """
+        response = self._get("/entity_types")
+        data = response.json()
+        entity_types = data.get("data", [])
+        logger.debug(f"Listed {len(entity_types)} entity types")
+        return entity_types
