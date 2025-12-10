@@ -157,8 +157,9 @@ class JobsResource(BaseResource):
         )
 
         # Step 3: Verify completion and download results
+        # Addepar Jobs API removes the status field when complete (status becomes falsy)
         final_status = job_data.get("data", {}).get("attributes", {}).get("status")
-        if final_status != "Completed":
+        if final_status:
             raise AddeparError(f"Job {job_id} finished with status: {final_status}")
 
         logger.info(f"Job {job_id} completed, downloading results")
