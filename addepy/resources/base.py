@@ -1,6 +1,6 @@
 """Base resource class with HTTP helpers and polling utilities."""
 
-from ..exceptions import AddeparTimeoutError
+from ..exceptions import AddePyTimeoutError
 from ..constants import (
     DEFAULT_BACKOFF_FACTOR,
     DEFAULT_INITIAL_WAIT,
@@ -122,7 +122,7 @@ class BaseResource:
             The final status data when is_complete_fn returns True
 
         Raises:
-            AddeparTimeoutError: If job doesn't complete within timeout
+            AddePyTimeoutError: If job doesn't complete within timeout
         """
         start_time = time.time()
         wait_time = initial_wait
@@ -135,7 +135,7 @@ class BaseResource:
                 logger.error(
                     f"{job_type.capitalize()} {job_id} timed out after {timeout}s"
                 )
-                raise AddeparTimeoutError(
+                raise AddePyTimeoutError(
                     f"{job_type.capitalize()} {job_id} did not complete within {timeout} seconds.",
                     job_id=job_id,
                     last_status=str(last_status) if last_status else None,

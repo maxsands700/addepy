@@ -10,7 +10,7 @@ from ...constants import (
     DEFAULT_MAX_WAIT,
     DEFAULT_TIMEOUT,
 )
-from ...exceptions import AddeparError
+from ...exceptions import AddePyError
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -45,7 +45,7 @@ class JobsResource(BaseResource):
             The job ID string.
 
         Raises:
-            AddeparError: If job creation fails or no job ID is returned.
+            AddePyError: If job creation fails or no job ID is returned.
         """
         job_query = {
             "data": {
@@ -62,7 +62,7 @@ class JobsResource(BaseResource):
 
         job_id = data.get("data", {}).get("id")
         if not job_id:
-            raise AddeparError(f"Failed to create job: {data}")
+            raise AddePyError(f"Failed to create job: {data}")
 
         logger.info(f"Created portfolio query job: {job_id}")
         return job_id
@@ -128,8 +128,8 @@ class JobsResource(BaseResource):
             Response containing the query results.
 
         Raises:
-            AddeparError: If job creation fails or job doesn't complete successfully.
-            AddeparTimeoutError: If job doesn't complete within timeout.
+            AddePyError: If job creation fails or job doesn't complete successfully.
+            AddePyTimeoutError: If job doesn't complete within timeout.
         """
         # Step 1: Submit the job (Tier 1)
         job_id = self.create_job(query_dict)
@@ -160,7 +160,7 @@ class JobsResource(BaseResource):
         # Addepar Jobs API removes the status field when complete (status becomes falsy)
         final_status = job_data.get("data", {}).get("attributes", {}).get("status")
         if final_status:
-            raise AddeparError(f"Job {job_id} finished with status: {final_status}")
+            raise AddePyError(f"Job {job_id} finished with status: {final_status}")
 
         logger.info(f"Job {job_id} completed, downloading results")
         return self.get_job_results(job_id)

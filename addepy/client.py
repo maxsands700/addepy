@@ -7,7 +7,7 @@ from dotenv import load_dotenv
 
 from .constants import DEFAULT_CONTENT_TYPE
 from .exceptions import (
-    AddeparError,
+    AddePyError,
     AuthenticationError,
     NotFoundError,
     RateLimitError,
@@ -146,7 +146,7 @@ class AddePy:
             RateLimitError: On 429 responses
             ValidationError: On 400/422 responses
             NotFoundError: On 404 responses
-            AddeparError: On other error responses
+            AddePyError: On other error responses
         """
         url = f"{self._base_url}{endpoint}"
 
@@ -189,7 +189,7 @@ class AddePy:
         elif status == 404:
             raise NotFoundError(message, response)
         else:
-            raise AddeparError(message, response)
+            raise AddePyError(message, response)
 
     def close(self) -> None:
         """Close the HTTP session."""

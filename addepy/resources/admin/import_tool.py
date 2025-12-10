@@ -16,7 +16,7 @@ from ...constants import (
     VALID_DELETE_IMPORT_TYPES,
     AddeparImportType,
 )
-from ...exceptions import AddeparError, ValidationError
+from ...exceptions import AddePyError, ValidationError
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -61,7 +61,7 @@ class ImportToolResource(BaseResource):
 
         Raises:
             ValidationError: If import_type is invalid.
-            AddeparError: If import creation fails or no import ID is returned.
+            AddePyError: If import creation fails or no import ID is returned.
         """
         normalized_type = import_type.upper()
 
@@ -110,7 +110,7 @@ class ImportToolResource(BaseResource):
             import_id = None
 
         if not import_id:
-            raise AddeparError(f"Failed to create import: {response.text}")
+            raise AddePyError(f"Failed to create import: {response.text}")
 
         mode = "dry run" if is_dry_run else "live"
         logger.info(f"Created {normalized_type} import ({mode}): {import_id}")
@@ -200,8 +200,8 @@ class ImportToolResource(BaseResource):
 
         Raises:
             ValidationError: If import_type is invalid.
-            AddeparError: If import fails or doesn't complete successfully.
-            AddeparTimeoutError: If import doesn't complete within timeout.
+            AddePyError: If import fails or doesn't complete successfully.
+            AddePyTimeoutError: If import doesn't complete within timeout.
         """
         # Step 1: Submit the import (Tier 1)
         import_id = self.create_import(
@@ -232,7 +232,7 @@ class ImportToolResource(BaseResource):
 
         # Step 3: Verify success and fetch results
         if final_status not in IMPORT_RESULT_READY_STATUSES:
-            raise AddeparError(f"Import {import_id} failed with status: {final_status}")
+            raise AddePyError(f"Import {import_id} failed with status: {final_status}")
 
         logger.info(f"Import {import_id} completed with status: {final_status}")
         return self.get_import_results(import_id)

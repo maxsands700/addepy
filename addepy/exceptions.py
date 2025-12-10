@@ -4,8 +4,8 @@ from typing import Optional
 import requests
 
 
-class AddeparError(Exception):
-    """Base exception for all Addepar API errors."""
+class AddePyError(Exception):
+    """Base exception for all AddePy SDK errors."""
 
     def __init__(
         self, message: str, response: Optional[requests.Response] = None
@@ -16,13 +16,13 @@ class AddeparError(Exception):
         self.status_code = response.status_code if response else None
 
 
-class AuthenticationError(AddeparError):
+class AuthenticationError(AddePyError):
     """Raised when API authentication fails (401)."""
 
     pass
 
 
-class RateLimitError(AddeparError):
+class RateLimitError(AddePyError):
     """Raised when rate limit is exceeded (429)."""
 
     def __init__(
@@ -35,19 +35,19 @@ class RateLimitError(AddeparError):
         self.retry_after = retry_after
 
 
-class ValidationError(AddeparError):
+class ValidationError(AddePyError):
     """Raised for invalid request parameters (400, 422)."""
 
     pass
 
 
-class NotFoundError(AddeparError):
+class NotFoundError(AddePyError):
     """Raised when a resource is not found (404)."""
 
     pass
 
 
-class AddeparTimeoutError(AddeparError):
+class AddePyTimeoutError(AddePyError):
     """Raised when polling times out waiting for job completion."""
 
     def __init__(

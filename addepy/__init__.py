@@ -23,8 +23,8 @@ import logging
 
 from .client import AddePy
 from .exceptions import (
-    AddeparError,
-    AddeparTimeoutError,
+    AddePyError,
+    AddePyTimeoutError,
     AuthenticationError,
     NotFoundError,
     RateLimitError,
@@ -39,10 +39,10 @@ __version__ = "0.1.0"
 
 __all__ = [
     "AddePy",
-    "AddeparError",
+    "AddePyError",
     "AuthenticationError",
     "RateLimitError",
     "ValidationError",
     "NotFoundError",
-    "AddeparTimeoutError",
+    "AddePyTimeoutError",
 ]

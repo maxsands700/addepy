@@ -142,26 +142,26 @@ Log levels:
 All methods raise descriptive exceptions on errors:
 
 ```python
-from addepy import AddePy, AddeparError, AddeparTimeoutError, ValidationError
+from addepy import AddePy, AddePyError, AddePyTimeoutError, ValidationError
 
 try:
     results = client.admin.import_tool.execute_import(df, 'INVALID_TYPE')
 except ValidationError as e:
     print(f"Invalid input: {e}")
-except AddeparTimeoutError as e:
+except AddePyTimeoutError as e:
     print(f"Job {e.job_id} timed out. Last status: {e.last_status}")
-except AddeparError as e:
+except AddePyError as e:
     print(f"API error: {e}")
 ```
 
 Available exceptions:
 
-- `AddeparError` - Base exception for all errors
+- `AddePyError` - Base exception for all errors
 - `AuthenticationError` - 401 authentication failures
 - `RateLimitError` - 429 rate limit exceeded (includes `retry_after`)
 - `ValidationError` - 400/422 validation errors
 - `NotFoundError` - 404 resource not found
-- `AddeparTimeoutError` - Job polling timeout (includes `job_id`, `last_status`)
+- `AddePyTimeoutError` - Job polling timeout (includes `job_id`, `last_status`)
 
 # Repository Structure
 
