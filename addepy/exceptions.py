@@ -22,6 +22,24 @@ class AuthenticationError(AddePyError):
     pass
 
 
+class ForbiddenError(AddePyError):
+    """Raised when user lacks required permissions (403)."""
+
+    pass
+
+
+class ConflictError(AddePyError):
+    """Raised when action would result in invalid data state (409)."""
+
+    pass
+
+
+class GoneError(AddePyError):
+    """Raised when resource was available but has expired (410)."""
+
+    pass
+
+
 class RateLimitError(AddePyError):
     """Raised when rate limit is exceeded (429)."""
 
