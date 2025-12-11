@@ -9,6 +9,9 @@ from .constants import DEFAULT_CONTENT_TYPE
 from .exceptions import (
     AddePyError,
     AuthenticationError,
+    ConflictError,
+    ForbiddenError,
+    GoneError,
     NotFoundError,
     RateLimitError,
     ValidationError,
@@ -177,8 +180,16 @@ class AddePy:
 
         if status == 401:
             raise AuthenticationError(message, response)
+        elif status == 403:
+            raise ForbiddenError(message, response)
+        elif status == 404:
+            raise NotFoundError(message, response)
+        elif status == 409:
+            raise ConflictError(message, response)
+        elif status == 410:
+            raise GoneError(message, response)
         elif status == 429:
-            retry_after = response.headers.get("Retry-After")
+            retry_after = response.headers.get("X-RateLimit-Retry-After")
             raise RateLimitError(
                 message,
                 response,
@@ -186,8 +197,6 @@ class AddePy:
             )
         elif status in (400, 422):
             raise ValidationError(message, response)
-        elif status == 404:
-            raise NotFoundError(message, response)
         else:
             raise AddePyError(message, response)
 
