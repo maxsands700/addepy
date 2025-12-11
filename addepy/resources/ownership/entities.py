@@ -1,6 +1,5 @@
 """Entities resource for the Addepar API."""
 
-import json
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -109,9 +108,11 @@ class EntitiesResource(BaseResource):
         model_type: str,
         currency_factor: Optional[str] = None,
         *,
+        underlying_type: Optional[str] = None,
+        delivery_price: Optional[Dict[str, Any]] = None,
         allow_new_investment_types: bool = False,
         **attributes: Any,
-    ) -> str:
+    ) -> Dict[str, Any]:
         """
         Create a single entity.
 
@@ -119,11 +120,15 @@ class EntitiesResource(BaseResource):
             original_name: Name of the entity (e.g., "Smith Trust").
             model_type: The entity type (e.g., "TRUST", "PERSON_NODE").
             currency_factor: Currency code (e.g., "USD"). Required for non-client entities.
+            underlying_type: Required for forward/futures contracts. One of:
+                INTEREST_RATE, CURRENCY, COMMODITY, SECURITY, INDEX.
+            delivery_price: Required for forward contracts. Money value object,
+                e.g., {"value": 100.5, "currency": "USD"}.
             allow_new_investment_types: Set True if creating a custom/new investment type.
             **attributes: Additional attributes for the entity.
 
         Returns:
-            The ID of the created entity.
+            The created entity resource object containing id, type, and attributes.
 
         Raises:
             AddePyError: If entity creation fails.
@@ -135,6 +140,10 @@ class EntitiesResource(BaseResource):
         }
         if currency_factor is not None:
             entity_attributes["currency_factor"] = currency_factor
+        if underlying_type is not None:
+            entity_attributes["underlying_type"] = underlying_type
+        if delivery_price is not None:
+            entity_attributes["delivery_price"] = delivery_price
 
         payload = {
             "data": {
@@ -150,19 +159,19 @@ class EntitiesResource(BaseResource):
         response = self._post("/entities", json=payload, params=params if params else None)
         data = response.json()
 
-        entity_id = data.get("data", {}).get("id")
-        if not entity_id:
+        entity = data.get("data", {})
+        if not entity.get("id"):
             raise AddePyError(f"Failed to create entity: {data}")
 
-        logger.info(f"Created entity: {entity_id}")
-        return entity_id
+        logger.info(f"Created entity: {entity.get('id')}")
+        return entity
 
     def create_entities(
         self,
         entities: List[Dict[str, Any]],
         *,
         allow_new_investment_types: bool = False,
-    ) -> List[str]:
+    ) -> List[Dict[str, Any]]:
         """
         Bulk create entities.
 
@@ -174,7 +183,7 @@ class EntitiesResource(BaseResource):
             allow_new_investment_types: Set True if creating custom/new investment types.
 
         Returns:
-            List of created entity IDs.
+            List of created entity resource objects.
 
         Raises:
             AddePyError: If entity creation fails.
@@ -194,13 +203,12 @@ class EntitiesResource(BaseResource):
         data = response.json()
 
         created = data.get("data", [])
-        entity_ids = [entity.get("id") for entity in created if entity.get("id")]
 
-        if len(entity_ids) != len(entities):
+        if len(created) != len(entities):
             raise AddePyError(f"Failed to create all entities: {data}")
 
-        logger.info(f"Created {len(entity_ids)} entities")
-        return entity_ids
+        logger.info(f"Created {len(created)} entities")
+        return created
 
     def update_entity(
         self,
@@ -325,7 +333,7 @@ class EntitiesResource(BaseResource):
             ]
         }
 
-        self._delete("/entities", data=json.dumps(payload))
+        self._delete("/entities", json=payload)
         logger.info(f"Deleted {len(entity_ids)} entities")
 
     # =========================================================================

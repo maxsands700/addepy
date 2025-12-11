@@ -76,6 +76,7 @@ class BaseResource:
     def _delete(
             self,
             endpoint: str,
+            json: Optional[Dict[str, Any]] = None,
             data: Optional[str] = None,
             params: Optional[Dict[str, Any]] = None,
             headers: Optional[Dict[str, str]] = None,
@@ -83,7 +84,7 @@ class BaseResource:
         ) -> requests.Response:
         """Make a DELETE request."""
         return self._client._request(
-            "DELETE", endpoint, data=data, params=params, headers=headers, **kwargs
+            "DELETE", endpoint, json=json, data=data, params=params, headers=headers, **kwargs
         )
 
     # =========================================================================
