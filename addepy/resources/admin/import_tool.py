@@ -125,13 +125,17 @@ class ImportToolResource(BaseResource):
 
         Returns:
             Status string. Possible values:
-            - 'IN_QUEUE': Import is queued
-            - 'IMPORT_SUCCESSFUL': Completed successfully
-            - 'DRY_RUN_SUCCESSFUL': Dry run completed
-            - 'ERRORS_READY_FOR_REVIEW': Has errors to review
-            - 'WARNINGS_READY_FOR_REVIEW': Has warnings to review
-            - 'VALIDATION_FAILED': Validation failed
-            - 'IMPORT_FAILED': Import failed
+            - 'UPLOADING': Data is being uploaded (initial state)
+            - 'IN_QUEUE': Import is queued for processing
+            - 'VALIDATING': Data is being validated
+            - 'IMPORTING': Validated data is being imported
+            - 'ERRORS_READY_FOR_REVIEW': Errors found, review required
+            - 'WARNINGS_READY_FOR_REVIEW': Warnings found, review recommended
+            - 'ERRORS_AND_WARNINGS_READY_FOR_REVIEW': Both errors and warnings found
+            - 'DRY_RUN_SUCCESSFUL': Dry run completed successfully
+            - 'IMPORT_SUCCESSFUL': Import completed successfully
+            - 'VALIDATION_FAILED': Validation failed due to unknown error
+            - 'IMPORT_FAILED': Import failed due to unknown error
         """
         response = self._get(f"/imports/{import_id}")
         data = response.json()
@@ -148,9 +152,9 @@ class ImportToolResource(BaseResource):
 
         Returns:
             Dictionary with keys:
-            - 'digests': Summary of imported data
-            - 'warnings': Any warnings encountered
-            - 'errors': Any errors encountered
+            - 'digests': List of summary strings (e.g., ["1 attribute will be created"])
+            - 'warnings': List of warning objects with 'message', 'type', 'affected_members'
+            - 'errors': List of error objects with 'message', 'type', 'affected_members'
         """
         logger.debug(f"Fetching results for import {import_id}")
         response = self._get(f"/import_results/{import_id}")
@@ -158,9 +162,9 @@ class ImportToolResource(BaseResource):
         attributes = data.get("data", {}).get("attributes", {})
 
         return {
-            "digests": attributes.get("digests", {}),
-            "warnings": attributes.get("warnings", {}),
-            "errors": attributes.get("errors", {}),
+            "digests": attributes.get("digests", []),
+            "warnings": attributes.get("warnings", []),
+            "errors": attributes.get("errors", []),
         }
 
     # =========================================================================
