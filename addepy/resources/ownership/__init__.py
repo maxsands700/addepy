@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from ...client import AddeparClient
     from .entities import EntitiesResource
+    from .external_id_types import ExternalIdTypesResource
     from .groups import GroupsResource
     from .group_types import GroupTypesResource
     from .positions import PositionsResource
@@ -16,6 +17,7 @@ class OwnershipNamespace:
 
     Resources:
         - entities: Manage entities and query entity types
+        - external_id_types: Manage external ID types
         - groups: Manage groups and group members
         - group_types: Manage group types
         - positions: Manage positions and ownership relationships
@@ -24,6 +26,7 @@ class OwnershipNamespace:
     def __init__(self, client: "AddeparClient") -> None:
         self._client = client
         self._entities: Optional["EntitiesResource"] = None
+        self._external_id_types: Optional["ExternalIdTypesResource"] = None
         self._groups: Optional["GroupsResource"] = None
         self._group_types: Optional["GroupTypesResource"] = None
         self._positions: Optional["PositionsResource"] = None
@@ -36,6 +39,15 @@ class OwnershipNamespace:
 
             self._entities = EntitiesResource(self._client)
         return self._entities
+
+    @property
+    def external_id_types(self) -> "ExternalIdTypesResource":
+        """Access the External ID Types resource."""
+        if self._external_id_types is None:
+            from .external_id_types import ExternalIdTypesResource
+
+            self._external_id_types = ExternalIdTypesResource(self._client)
+        return self._external_id_types
 
     @property
     def groups(self) -> "GroupsResource":
@@ -65,4 +77,11 @@ class OwnershipNamespace:
         return self._positions
 
 
-__all__ = ["OwnershipNamespace", "EntitiesResource", "GroupsResource", "GroupTypesResource", "PositionsResource"]
+__all__ = [
+    "OwnershipNamespace",
+    "EntitiesResource",
+    "ExternalIdTypesResource",
+    "GroupsResource",
+    "GroupTypesResource",
+    "PositionsResource",
+]
