@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from ...client import AddeparClient
 
+from .billable_portfolios import BillablePortfoliosResource
 from .contacts import ContactsResource
 from .import_tool import ImportToolResource
 from .users import UsersResource
@@ -14,6 +15,7 @@ class AdminNamespace:
     Namespace for admin-related API resources.
 
     Usage:
+        client.admin.billable_portfolios.create_billable_portfolio(...)
         client.admin.contacts.get_contact(...)
         client.admin.contacts.list_contacts()
         client.admin.import_tool.create_import(...)
@@ -24,9 +26,17 @@ class AdminNamespace:
 
     def __init__(self, client: "AddeparClient") -> None:
         self._client = client
+        self._billable_portfolios: Optional[BillablePortfoliosResource] = None
         self._contacts: Optional[ContactsResource] = None
         self._import_tool: Optional[ImportToolResource] = None
         self._users: Optional[UsersResource] = None
+
+    @property
+    def billable_portfolios(self) -> BillablePortfoliosResource:
+        """Access billable portfolios resource."""
+        if self._billable_portfolios is None:
+            self._billable_portfolios = BillablePortfoliosResource(self._client)
+        return self._billable_portfolios
 
     @property
     def contacts(self) -> ContactsResource:
@@ -50,4 +60,10 @@ class AdminNamespace:
         return self._users
 
 
-__all__ = ["AdminNamespace", "ContactsResource", "ImportToolResource", "UsersResource"]
+__all__ = [
+    "AdminNamespace",
+    "BillablePortfoliosResource",
+    "ContactsResource",
+    "ImportToolResource",
+    "UsersResource",
+]
