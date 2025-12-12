@@ -9,6 +9,7 @@ from .billable_portfolios import BillablePortfoliosResource
 from .contacts import ContactsResource
 from .files import FilesResource
 from .import_tool import ImportToolResource
+from .reports import ReportsResource
 from .roles import RolesResource
 from .teams import TeamsResource
 from .users import UsersResource
@@ -28,6 +29,8 @@ class AdminNamespace:
         client.admin.files.upload_file(...)
         client.admin.import_tool.create_import(...)
         client.admin.import_tool.execute_import(...)
+        client.admin.reports.list_reports(...)
+        client.admin.reports.create_report_generation_job(...)
         client.admin.roles.get_role(...)
         client.admin.roles.list_roles()
         client.admin.teams.create_team(...)
@@ -43,6 +46,7 @@ class AdminNamespace:
         self._contacts: Optional[ContactsResource] = None
         self._files: Optional[FilesResource] = None
         self._import_tool: Optional[ImportToolResource] = None
+        self._reports: Optional[ReportsResource] = None
         self._roles: Optional[RolesResource] = None
         self._teams: Optional[TeamsResource] = None
         self._users: Optional[UsersResource] = None
@@ -83,6 +87,13 @@ class AdminNamespace:
         return self._import_tool
 
     @property
+    def reports(self) -> ReportsResource:
+        """Access reports resource."""
+        if self._reports is None:
+            self._reports = ReportsResource(self._client)
+        return self._reports
+
+    @property
     def roles(self) -> RolesResource:
         """Access roles resource."""
         if self._roles is None:
@@ -111,6 +122,7 @@ __all__ = [
     "ContactsResource",
     "FilesResource",
     "ImportToolResource",
+    "ReportsResource",
     "RolesResource",
     "TeamsResource",
     "UsersResource",
