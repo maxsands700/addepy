@@ -5,9 +5,8 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from ...client import AddeparClient
     from .entities import EntitiesResource
-    from .external_id_types import ExternalIdTypesResource
+    from .external_ids import ExternalIdsResource
     from .groups import GroupsResource
-    from .group_types import GroupTypesResource
     from .positions import PositionsResource
 
 
@@ -17,18 +16,16 @@ class OwnershipNamespace:
 
     Resources:
         - entities: Manage entities and query entity types
-        - external_id_types: Manage external ID types
-        - groups: Manage groups and group members
-        - group_types: Manage group types
+        - external_ids: Manage external ID types
+        - groups: Manage groups and query group types
         - positions: Manage positions and ownership relationships
     """
 
     def __init__(self, client: "AddeparClient") -> None:
         self._client = client
         self._entities: Optional["EntitiesResource"] = None
-        self._external_id_types: Optional["ExternalIdTypesResource"] = None
+        self._external_ids: Optional["ExternalIdsResource"] = None
         self._groups: Optional["GroupsResource"] = None
-        self._group_types: Optional["GroupTypesResource"] = None
         self._positions: Optional["PositionsResource"] = None
 
     @property
@@ -41,13 +38,13 @@ class OwnershipNamespace:
         return self._entities
 
     @property
-    def external_id_types(self) -> "ExternalIdTypesResource":
-        """Access the External ID Types resource."""
-        if self._external_id_types is None:
-            from .external_id_types import ExternalIdTypesResource
+    def external_ids(self) -> "ExternalIdsResource":
+        """Access the External IDs resource."""
+        if self._external_ids is None:
+            from .external_ids import ExternalIdsResource
 
-            self._external_id_types = ExternalIdTypesResource(self._client)
-        return self._external_id_types
+            self._external_ids = ExternalIdsResource(self._client)
+        return self._external_ids
 
     @property
     def groups(self) -> "GroupsResource":
@@ -57,15 +54,6 @@ class OwnershipNamespace:
 
             self._groups = GroupsResource(self._client)
         return self._groups
-
-    @property
-    def group_types(self) -> "GroupTypesResource":
-        """Access the Group Types resource."""
-        if self._group_types is None:
-            from .group_types import GroupTypesResource
-
-            self._group_types = GroupTypesResource(self._client)
-        return self._group_types
 
     @property
     def positions(self) -> "PositionsResource":
@@ -80,8 +68,7 @@ class OwnershipNamespace:
 __all__ = [
     "OwnershipNamespace",
     "EntitiesResource",
-    "ExternalIdTypesResource",
+    "ExternalIdsResource",
     "GroupsResource",
-    "GroupTypesResource",
     "PositionsResource",
 ]

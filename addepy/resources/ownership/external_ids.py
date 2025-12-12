@@ -1,4 +1,4 @@
-"""External ID Types resource for the Addepar API."""
+"""External IDs resource for the Addepar API."""
 import logging
 from typing import Any, Dict, List
 
@@ -7,7 +7,7 @@ from ..base import BaseResource
 logger = logging.getLogger("addepy")
 
 
-class ExternalIdTypesResource(BaseResource):
+class ExternalIdsResource(BaseResource):
     """
     Resource for Addepar External ID Types API.
 
@@ -35,7 +35,7 @@ class ExternalIdTypesResource(BaseResource):
             attributes (external_type_key, display_name).
 
         Example:
-            ext_type = client.ownership.external_id_types.get_external_id_type(
+            ext_type = client.ownership.external_ids.get_external_id_type(
                 external_id_type_id="salesforce"
             )
             print(ext_type["attributes"]["display_name"])
@@ -55,7 +55,7 @@ class ExternalIdTypesResource(BaseResource):
             and attributes (external_type_key, display_name).
 
         Example:
-            types = client.ownership.external_id_types.list_external_id_types()
+            types = client.ownership.external_ids.list_external_id_types()
             for t in types:
                 print(f"{t['id']}: {t['attributes']['display_name']}")
         """
@@ -81,7 +81,7 @@ class ExternalIdTypesResource(BaseResource):
             The created external ID type resource object.
 
         Example:
-            new_type = client.ownership.external_id_types.create_external_id_type(
+            new_type = client.ownership.external_ids.create_external_id_type(
                 external_type_key="salesforce",
                 display_name="Salesforce"
             )
@@ -118,7 +118,7 @@ class ExternalIdTypesResource(BaseResource):
             The updated external ID type resource object.
 
         Example:
-            updated = client.ownership.external_id_types.update_external_id_type(
+            updated = client.ownership.external_ids.update_external_id_type(
                 external_id_type_id="salesforce",
                 display_name="Salesforce CRM"
             )
@@ -150,7 +150,7 @@ class ExternalIdTypesResource(BaseResource):
             external_id_type_id: The ID (external_type_key) of the type.
 
         Example:
-            client.ownership.external_id_types.delete_external_id_type(
+            client.ownership.external_ids.delete_external_id_type(
                 external_id_type_id="salesforce"
             )
         """

@@ -20,7 +20,7 @@ ADDEPAR_API_KEY=your_base64_encoded_api_key
 
 `ADDEPAR_FIRM_NAME` is your URL subdomain: `https://{ADDEPAR_FIRM_NAME}.addepar.com`
 
-## Usage
+## Basic Usage
 
 ```python
 from addepy import AddePy
@@ -68,9 +68,8 @@ addepy/
     │
     ├── ownership/             # OWNERSHIP namespace
     │   ├── entities.py        # Entities & entity types
-    │   ├── external_id_types.py  # External system mappings
-    │   ├── groups.py          # Group management
-    │   ├── group_types.py     # Group type definitions
+    │   ├── external_ids.py    # External system mappings
+    │   ├── groups.py          # Groups & group types
     │   └── positions.py       # Ownership relationships
     │
     └── admin/                 # ADMIN namespace
@@ -169,33 +168,27 @@ logging.getLogger("addepy").addHandler(logging.StreamHandler())
 
 Real-world automation examples for wealth management firms:
 
-### 1. Daily Portfolio Valuation Report
+### Audit & Compliance Monitoring
 
 ```python
 from addepy import AddePy
-import pandas as pd
+from datetime import datetime, timedelta
 
-addepy = AddePy()
+# 1. Query recent attribute changes on sensitive fields
+week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
+changes = addepy.admin.audit.query_attribute_changes(
+    start_date=week_ago,
+    attribute_keys=["cost_basis", "value", "owner", "account_number"]
+)
 
-# Get all client entities
-clients = addepy.ownership.entities.list_entities(entity_type="client")
+# 2. Flag changes for compliance review
+flagged = flag_for_compliance(changes)  # Your custom logic
 
-# Run a portfolio query for each client's holdings
-results = addepy.portfolio.jobs.execute_portfolio_query({
-    "columns": [{"key": "value"}, {"key": "cost_basis"}, {"key": "unrealized_gain_loss"}],
-    "groupings": [{"key": "asset_class"}, {"key": "security"}],
-    "portfolio_type": "FIRM_CLIENTS",
-    "portfolio_id": 1,
-    "start_date": "2024-01-01",
-    "end_date": "2024-12-31"
-})
-
-# Export to Excel for distribution
-df = pd.DataFrame(results)
-df.to_excel("daily_valuations.xlsx")
+# 3. Generate report and notify stakeholders
+send_compliance_report(flagged)  # Your email/Slack integration
 ```
 
-### 2. Automated Client Onboarding
+### Prospecting & Client Onboarding Workflows
 
 ```python
 # Create new client entity
@@ -220,45 +213,13 @@ addepy.ownership.positions.create_position(
 )
 
 # Map to CRM system
-addepy.ownership.external_id_types.create_external_id_type(
+addepy.ownership.external_ids.create_external_id_type(
     external_type_key="salesforce",
     display_name="Salesforce"
 )
 ```
 
-### 3. Monthly Performance Reporting
-
-```python
-# Execute saved view for all households
-households = addepy.ownership.groups.list_groups(group_type="household")
-
-for household in households:
-    # Generate performance report as Excel
-    report_data = addepy.portfolio.analysis.get_view_results(
-        view_id="quarterly_performance",
-        portfolio_id=int(household["id"]),
-        portfolio_type="GROUP",
-        start_date="2024-10-01",
-        end_date="2024-12-31",
-        output_type="XLSX"
-    )
-
-    # Upload to client portal
-    file = addepy.admin.files.upload_file(
-        file_data=report_data,
-        name=f"{household['attributes']['name']}_Q4_Performance.xlsx",
-        group_ids=[household["id"]]
-    )
-
-    # Publish to client portal with notification
-    addepy.admin.client_portal.publish_files(
-        files_id=[int(file["id"])],
-        portal_publishing="publish",
-        contact_notification="notify"
-    )
-```
-
-### 4. Billing Data Preparation
+### Billing Workflows
 
 ```python
 # Get all billable portfolios
@@ -282,7 +243,7 @@ df = pd.DataFrame(billing_data["data"]["attributes"]["total"]["children"])
 df.to_csv("quarterly_billing_aum.csv")
 ```
 
-### 5. Rebalancing Analysis
+### Rebalancing Analysis, Integrations w/ Trading Systems
 
 ```python
 # Get target allocations for a portfolio
@@ -305,7 +266,7 @@ for holding in current_holdings["data"]["attributes"]["total"]["children"]:
     # Compare to target and flag if drift > threshold
 ```
 
-### 6. Bulk Transaction Import
+### Bulk Imports
 
 ```python
 import pandas as pd
@@ -329,32 +290,7 @@ result = addepy.admin.import_tool.execute_import(
 print(f"Imported {result['success_count']} transactions")
 ```
 
-### 7. Audit & Compliance Monitoring
-
-```python
-from datetime import datetime, timedelta
-
-# Monitor login attempts for the past week
-week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-
-login_attempts = addepy.admin.audit.query_login_attempts(
-    start_date=week_ago,
-    end_date=datetime.now().strftime("%Y-%m-%d")
-)
-
-# Flag failed attempts
-failed_logins = [l for l in login_attempts if l["attributes"]["success"] == False]
-if failed_logins:
-    print(f"Alert: {len(failed_logins)} failed login attempts this week")
-
-# Track attribute changes on sensitive fields
-changes = addepy.admin.audit.query_attribute_changes(
-    start_date=week_ago,
-    attribute_keys=["cost_basis", "value", "owner"]
-)
-```
-
-### 8. CRM Integration via External IDs
+### Integration with External Systems (CRM, Custodians, Trading, etc.)
 
 ```python
 # Sync Salesforce contacts with Addepar entities
@@ -385,26 +321,7 @@ for contact in salesforce_contacts:
         )
 ```
 
-### 9. Historical Price Backfill
-
-```python
-# Backfill prices for a private security
-prices = [
-    {"date": "2024-01-01", "nodeId": 12345, "value": 100.00},
-    {"date": "2024-02-01", "nodeId": 12345, "value": 102.50},
-    {"date": "2024-03-01", "nodeId": 12345, "value": 105.25},
-    {"date": "2024-04-01", "nodeId": 12345, "value": 103.00},
-]
-
-job_id = addepy.portfolio.historical_prices.create_prices(
-    entity_id="12345",
-    prices=prices
-)
-
-print(f"Price backfill job submitted: {job_id}")
-```
-
-### 10. Team Access Management
+### Team Access Management
 
 ```python
 # Create a new team for junior analysts
