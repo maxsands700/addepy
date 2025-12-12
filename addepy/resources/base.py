@@ -236,3 +236,68 @@ class BaseResource:
 
             request_params["page[after]"] = page_after
             page_number += 1
+
+    def _paginate_offset(
+            self,
+            endpoint: str,
+            *,
+            params: Optional[Dict[str, Any]] = None,
+            page_size: int = 50,
+        ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Auto-paginate through all results using offset-based pagination.
+
+        Yields each item from the 'data' array across all pages.
+        Follows the JSON:API pagination pattern using page[size] and page[number].
+
+        Args:
+            endpoint: API endpoint (e.g., "/generated_reports")
+            params: Additional query parameters (filters, etc.)
+            page_size: Results per page (default: 50)
+
+        Yields:
+            Individual resource objects from the 'data' array
+
+        Example:
+            for report in self._paginate_offset("/generated_reports"):
+                print(report["id"], report["attributes"]["status"])
+
+            # Or collect all at once:
+            all_reports = list(self._paginate_offset("/generated_reports"))
+        """
+        # Build initial params
+        request_params = dict(params) if params else {}
+        request_params["page[size]"] = page_size
+        request_params["page[number]"] = 0
+
+        page_number = 0
+        total_items = 0
+
+        while True:
+            logger.debug(f"Fetching page {page_number} from {endpoint}")
+            response = self._get(endpoint, params=request_params)
+            data = response.json()
+
+            # Yield each item from the data array
+            items = data.get("data", [])
+            if isinstance(items, dict):
+                # Single item response
+                items = [items]
+
+            for item in items:
+                total_items += 1
+                yield item
+
+            logger.debug(f"Page {page_number}: fetched {len(items)} items")
+
+            # Check for next page
+            next_url = data.get("links", {}).get("next")
+            if not next_url:
+                logger.debug(
+                    f"Pagination complete: {total_items} total items from {page_number + 1} pages"
+                )
+                break
+
+            # Increment page number for next request
+            page_number += 1
+            request_params["page[number]"] = page_number
