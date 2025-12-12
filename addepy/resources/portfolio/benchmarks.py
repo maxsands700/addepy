@@ -2,7 +2,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import BenchmarkType, DEFAULT_PAGE_LIMIT, MatchingType
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -105,7 +105,7 @@ class BenchmarksResource(BaseResource):
 
     def create_benchmark(
         self,
-        benchmark_type: str,
+        benchmark_type: BenchmarkType,
         *,
         name: Optional[str] = None,
         blended: Optional[Dict[str, Any]] = None,
@@ -472,7 +472,7 @@ class BenchmarksResource(BaseResource):
     def create_benchmark_association_strategy(
         self,
         display_name: str,
-        matching_type: str,
+        matching_type: MatchingType,
         benchmark_associations: List[Dict[str, Any]],
     ) -> Dict[str, Any]:
         """

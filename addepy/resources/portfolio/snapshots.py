@@ -2,6 +2,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
+from ...constants import SnapshotType
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -58,7 +59,7 @@ class SnapshotsResource(BaseResource):
 
     def create_snapshot(
         self,
-        snapshot_type: str,
+        snapshot_type: SnapshotType,
         currency: str,
         trade_date: str,
         amount: float,

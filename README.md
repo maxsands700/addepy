@@ -219,30 +219,6 @@ addepy.ownership.external_ids.create_external_id_type(
 )
 ```
 
-### Billing Workflows
-
-```python
-# Get all billable portfolios
-billable = addepy.admin.billable_portfolios.list_billable_portfolios()
-
-# Query AUM for billing calculations
-billing_data = addepy.portfolio.analysis.query(
-    columns=[
-        {"key": "value", "arguments": {"time_point": "end"}},
-        {"key": "average_daily_value"}
-    ],
-    groupings=[{"key": "owner_name"}],
-    portfolio_type="FIRM",
-    portfolio_id=1,
-    start_date="2024-10-01",
-    end_date="2024-12-31"
-)
-
-# Export for billing system
-df = pd.DataFrame(billing_data["data"]["attributes"]["total"]["children"])
-df.to_csv("quarterly_billing_aum.csv")
-```
-
 ### Rebalancing Analysis, Integrations w/ Trading Systems
 
 ```python

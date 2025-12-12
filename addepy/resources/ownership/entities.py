@@ -3,7 +3,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import DEFAULT_PAGE_LIMIT, UnderlyingType
 from ...exceptions import AddePyError
 from ..base import BaseResource
 
@@ -108,7 +108,7 @@ class EntitiesResource(BaseResource):
         model_type: str,
         currency_factor: Optional[str] = None,
         *,
-        underlying_type: Optional[str] = None,
+        underlying_type: Optional[UnderlyingType] = None,
         delivery_price: Optional[Dict[str, Any]] = None,
         allow_new_investment_types: bool = False,
         **attributes: Any,

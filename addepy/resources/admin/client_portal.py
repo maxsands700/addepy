@@ -2,6 +2,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
+from ...constants import ContactNotification, PortalPublishing
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -20,8 +21,8 @@ class ClientPortalResource(BaseResource):
     def publish_files(
         self,
         files_id: List[int],
-        portal_publishing: str,
-        contact_notification: str,
+        portal_publishing: PortalPublishing,
+        contact_notification: ContactNotification,
         *,
         publish_override_contact_ids: Optional[List[int]] = None,
     ) -> List[Dict[str, Any]]:

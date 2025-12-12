@@ -10,6 +10,8 @@ from ...constants import (
     DEFAULT_MAX_WAIT,
     DEFAULT_PAGE_LIMIT,
     DEFAULT_TIMEOUT,
+    PortfolioType,
+    TransactionOutputType,
 )
 from ...exceptions import AddePyError
 from ..base import BaseResource
@@ -73,10 +75,10 @@ class TransactionJobsResource(BaseResource):
         self,
         view_id: str,
         portfolio_id: str,
-        portfolio_type: str,
+        portfolio_type: PortfolioType,
         start_date: str,
         end_date: str,
-        output_type: str = "CSV",
+        output_type: TransactionOutputType = "CSV",
     ) -> str:
         """
         Submit a transaction view job to the Addepar API.
@@ -128,7 +130,7 @@ class TransactionJobsResource(BaseResource):
     def create_query_job(
         self,
         columns: List[str],
-        portfolio_type: str,
+        portfolio_type: PortfolioType,
         portfolio_id: Union[str, List[str]],
         start_date: str,
         end_date: str,
@@ -296,10 +298,10 @@ class TransactionJobsResource(BaseResource):
         self,
         view_id: str,
         portfolio_id: str,
-        portfolio_type: str,
+        portfolio_type: PortfolioType,
         start_date: str,
         end_date: str,
-        output_type: str = "CSV",
+        output_type: TransactionOutputType = "CSV",
         *,
         initial_wait: float = DEFAULT_INITIAL_WAIT,
         max_wait: float = DEFAULT_MAX_WAIT,
@@ -352,13 +354,13 @@ class TransactionJobsResource(BaseResource):
     def execute_query_job(
         self,
         columns: List[str],
-        portfolio_type: str,
+        portfolio_type: PortfolioType,
         portfolio_id: Union[str, List[str]],
         start_date: str,
         end_date: str,
         *,
-        filters: Optional[List[Dict[str, Any]]] = None,
-        sorting: Optional[List[Dict[str, Any]]] = None,
+        filters: [List[Dict[str, Any]]] = [],
+        sorting: [List[Dict[str, Any]]] = [],
         limit: Optional[int] = None,
         include_online_valuations: bool = False,
         include_unverified: bool = False,
@@ -380,8 +382,8 @@ class TransactionJobsResource(BaseResource):
             portfolio_id: Portfolio ID or list of IDs. Use "1" if portfolio_type is FIRM.
             start_date: Start date in YYYY-MM-DD format.
             end_date: End date in YYYY-MM-DD format.
-            filters: Optional list of filter objects.
-            sorting: Optional list of sorting objects (up to 3 columns).
+            filters: List of filter objects. Default is an empty list.
+            sorting: List of sorting objects (up to 3 columns). Default is an empty list.
             limit: Max number of transactions to return.
             include_online_valuations: Include online snapshots (default: False).
             include_unverified: Include unverified transactions (default: False).

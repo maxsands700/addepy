@@ -2,7 +2,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import DEFAULT_PAGE_LIMIT, LoginMethod
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -88,7 +88,7 @@ class UsersResource(BaseResource):
     def create_user(
         self,
         email: str,
-        login_method: str = "email_password",
+        login_method: LoginMethod = "email_password",
         *,
         first_name: Optional[str] = None,
         last_name: Optional[str] = None,

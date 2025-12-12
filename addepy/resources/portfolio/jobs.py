@@ -10,6 +10,8 @@ from ...constants import (
     DEFAULT_MAX_WAIT,
     DEFAULT_PAGE_LIMIT,
     DEFAULT_TIMEOUT,
+    OutputType,
+    PortfolioType,
 )
 from ...exceptions import AddePyError
 from ..base import BaseResource
@@ -69,7 +71,7 @@ class JobsResource(BaseResource):
 
     def create_query_job(
         self,
-        portfolio_type: str,
+        portfolio_type: PortfolioType,
         portfolio_id: str,
         start_date: str,
         end_date: str,
@@ -135,11 +137,11 @@ class JobsResource(BaseResource):
     def create_view_job(
         self,
         view_id: str,
-        portfolio_type: str,
+        portfolio_type: PortfolioType,
         portfolio_id: str,
         start_date: str,
         end_date: str,
-        output_type: str = "JSON",
+        output_type: OutputType = "JSON",
     ) -> str:
         """
         Submit a portfolio view job to the Addepar API.
@@ -251,7 +253,7 @@ class JobsResource(BaseResource):
         """
         response = self._get(f"/jobs/{job_id}")
         data = response.json()
-        status = data.get("data", {}).get("attributes", {}).get("status", "Unknown")
+        status = data.get("data", {}).get("attributes", {}).get("status", "Completed") # Default to Completed if status is not found
         logger.debug(f"Job {job_id} status: {status}")
         return data
 
@@ -350,11 +352,11 @@ class JobsResource(BaseResource):
     def execute_view_job(
         self,
         view_id: str,
-        portfolio_type: str,
+        portfolio_type: PortfolioType,
         portfolio_id: str,
         start_date: str,
         end_date: str,
-        output_type: str = "JSON",
+        output_type: OutputType = "JSON",
         *,
         initial_wait: float = DEFAULT_INITIAL_WAIT,
         max_wait: float = DEFAULT_MAX_WAIT,
@@ -422,7 +424,7 @@ class JobsResource(BaseResource):
         # Step 2: Poll for completion
         def check_status(jid: str) -> str:
             data = self.get_job_status(jid)
-            return data.get("data", {}).get("attributes", {}).get("status", "Unknown")
+            return data.get("data", {}).get("attributes", {}).get("status", "Completed") # Default to Completed if status is not found
 
         def is_complete(status: str) -> bool:
             return status in JOB_TERMINAL_STATUSES

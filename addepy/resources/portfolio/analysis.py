@@ -2,6 +2,7 @@
 import logging
 from typing import Any, Dict, List, Optional, Union
 
+from ...constants import OutputType, PortfolioType
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -97,10 +98,10 @@ class AnalysisResource(BaseResource):
         self,
         view_id: str,
         portfolio_id: int,
-        portfolio_type: str,
+        portfolio_type: PortfolioType,
         start_date: str,
         end_date: str,
-        output_type: str = "JSON",
+        output_type: OutputType = "JSON",
     ) -> Union[Dict[str, Any], bytes]:
         """
         Execute a saved portfolio view and get results.
@@ -183,7 +184,7 @@ class AnalysisResource(BaseResource):
         self,
         columns: List[Dict[str, Any]],
         groupings: List[Union[str, Dict[str, Any]]],
-        portfolio_type: str,
+        portfolio_type: PortfolioType,
         portfolio_id: Union[int, List[int]],
         start_date: str,
         end_date: str,
