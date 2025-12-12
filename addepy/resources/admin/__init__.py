@@ -7,6 +7,7 @@ if TYPE_CHECKING:
 from .audit import AuditResource
 from .billable_portfolios import BillablePortfoliosResource
 from .contacts import ContactsResource
+from .files import FilesResource
 from .import_tool import ImportToolResource
 from .roles import RolesResource
 from .teams import TeamsResource
@@ -23,6 +24,8 @@ class AdminNamespace:
         client.admin.billable_portfolios.create_billable_portfolio(...)
         client.admin.contacts.get_contact(...)
         client.admin.contacts.list_contacts()
+        client.admin.files.list_files(...)
+        client.admin.files.upload_file(...)
         client.admin.import_tool.create_import(...)
         client.admin.import_tool.execute_import(...)
         client.admin.roles.get_role(...)
@@ -38,6 +41,7 @@ class AdminNamespace:
         self._audit: Optional[AuditResource] = None
         self._billable_portfolios: Optional[BillablePortfoliosResource] = None
         self._contacts: Optional[ContactsResource] = None
+        self._files: Optional[FilesResource] = None
         self._import_tool: Optional[ImportToolResource] = None
         self._roles: Optional[RolesResource] = None
         self._teams: Optional[TeamsResource] = None
@@ -63,6 +67,13 @@ class AdminNamespace:
         if self._contacts is None:
             self._contacts = ContactsResource(self._client)
         return self._contacts
+
+    @property
+    def files(self) -> FilesResource:
+        """Access files resource."""
+        if self._files is None:
+            self._files = FilesResource(self._client)
+        return self._files
 
     @property
     def import_tool(self) -> ImportToolResource:
@@ -98,6 +109,7 @@ __all__ = [
     "AuditResource",
     "BillablePortfoliosResource",
     "ContactsResource",
+    "FilesResource",
     "ImportToolResource",
     "RolesResource",
     "TeamsResource",
