@@ -41,7 +41,7 @@ _The Import Tool via API is in Beta (as of 12/10/2025), so you may need to reque
 
 ## Design Philosophy
 
-###s Repository Structure
+### Repository Structure
 
 Mirrors the [Addepar API documentation](https://developers.addepar.com/docs/resource-overview):
 
