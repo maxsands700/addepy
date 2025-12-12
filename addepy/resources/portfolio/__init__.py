@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING, Optional
 if TYPE_CHECKING:
     from ...client import AddeparClient
 
+from .analysis import AnalysisResource
 from .benchmarks import BenchmarksResource
 from .jobs import JobsResource
 from .snapshots import SnapshotsResource
@@ -16,6 +17,9 @@ class PortfolioNamespace:
     Namespace for portfolio-related API resources.
 
     Usage:
+        client.portfolio.analysis.list_views()
+        client.portfolio.analysis.get_view_results(...)
+        client.portfolio.analysis.query(...)
         client.portfolio.benchmarks.list_benchmarks()
         client.portfolio.benchmarks.create_benchmark(...)
         client.portfolio.jobs.create_job(...)
@@ -28,11 +32,19 @@ class PortfolioNamespace:
 
     def __init__(self, client: "AddeparClient") -> None:
         self._client = client
+        self._analysis: Optional[AnalysisResource] = None
         self._benchmarks: Optional[BenchmarksResource] = None
         self._jobs: Optional[JobsResource] = None
         self._snapshots: Optional[SnapshotsResource] = None
         self._transactions: Optional[TransactionsResource] = None
         self._transaction_jobs: Optional[TransactionJobsResource] = None
+
+    @property
+    def analysis(self) -> AnalysisResource:
+        """Access analysis resource for portfolio views and queries."""
+        if self._analysis is None:
+            self._analysis = AnalysisResource(self._client)
+        return self._analysis
 
     @property
     def benchmarks(self) -> BenchmarksResource:
@@ -72,6 +84,7 @@ class PortfolioNamespace:
 
 __all__ = [
     "PortfolioNamespace",
+    "AnalysisResource",
     "BenchmarksResource",
     "JobsResource",
     "SnapshotsResource",
