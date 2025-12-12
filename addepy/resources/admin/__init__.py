@@ -9,6 +9,7 @@ from .billable_portfolios import BillablePortfoliosResource
 from .contacts import ContactsResource
 from .files import FilesResource
 from .import_tool import ImportToolResource
+from .target_allocations import TargetAllocationsResource
 from .reports import ReportsResource
 from .roles import RolesResource
 from .teams import TeamsResource
@@ -33,6 +34,8 @@ class AdminNamespace:
         client.admin.reports.create_report_generation_job(...)
         client.admin.roles.get_role(...)
         client.admin.roles.list_roles()
+        client.admin.target_allocations.list_allocation_models()
+        client.admin.target_allocations.create_allocation_template(...)
         client.admin.teams.create_team(...)
         client.admin.teams.list_teams()
         client.admin.users.get_user(...)
@@ -48,6 +51,7 @@ class AdminNamespace:
         self._import_tool: Optional[ImportToolResource] = None
         self._reports: Optional[ReportsResource] = None
         self._roles: Optional[RolesResource] = None
+        self._target_allocations: Optional[TargetAllocationsResource] = None
         self._teams: Optional[TeamsResource] = None
         self._users: Optional[UsersResource] = None
 
@@ -101,6 +105,13 @@ class AdminNamespace:
         return self._roles
 
     @property
+    def target_allocations(self) -> TargetAllocationsResource:
+        """Access target allocations resource."""
+        if self._target_allocations is None:
+            self._target_allocations = TargetAllocationsResource(self._client)
+        return self._target_allocations
+
+    @property
     def teams(self) -> TeamsResource:
         """Access teams resource."""
         if self._teams is None:
@@ -124,6 +135,7 @@ __all__ = [
     "ImportToolResource",
     "ReportsResource",
     "RolesResource",
+    "TargetAllocationsResource",
     "TeamsResource",
     "UsersResource",
 ]

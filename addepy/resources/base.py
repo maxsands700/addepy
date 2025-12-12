@@ -73,6 +73,12 @@ class BaseResource:
         """Make a PATCH request."""
         return self._client._request("PATCH", endpoint, json=json, **kwargs)
 
+    def _put(
+            self, endpoint: str, json: Optional[Dict[str, Any]] = None, **kwargs: Any
+        ) -> requests.Response:
+        """Make a PUT request."""
+        return self._client._request("PUT", endpoint, json=json, **kwargs)
+
     def _delete(
             self,
             endpoint: str,
