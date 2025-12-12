@@ -7,6 +7,8 @@ if TYPE_CHECKING:
 from .billable_portfolios import BillablePortfoliosResource
 from .contacts import ContactsResource
 from .import_tool import ImportToolResource
+from .roles import RolesResource
+from .teams import TeamsResource
 from .users import UsersResource
 
 
@@ -20,6 +22,10 @@ class AdminNamespace:
         client.admin.contacts.list_contacts()
         client.admin.import_tool.create_import(...)
         client.admin.import_tool.execute_import(...)
+        client.admin.roles.get_role(...)
+        client.admin.roles.list_roles()
+        client.admin.teams.create_team(...)
+        client.admin.teams.list_teams()
         client.admin.users.get_user(...)
         client.admin.users.list_users()
     """
@@ -29,6 +35,8 @@ class AdminNamespace:
         self._billable_portfolios: Optional[BillablePortfoliosResource] = None
         self._contacts: Optional[ContactsResource] = None
         self._import_tool: Optional[ImportToolResource] = None
+        self._roles: Optional[RolesResource] = None
+        self._teams: Optional[TeamsResource] = None
         self._users: Optional[UsersResource] = None
 
     @property
@@ -53,6 +61,20 @@ class AdminNamespace:
         return self._import_tool
 
     @property
+    def roles(self) -> RolesResource:
+        """Access roles resource."""
+        if self._roles is None:
+            self._roles = RolesResource(self._client)
+        return self._roles
+
+    @property
+    def teams(self) -> TeamsResource:
+        """Access teams resource."""
+        if self._teams is None:
+            self._teams = TeamsResource(self._client)
+        return self._teams
+
+    @property
     def users(self) -> UsersResource:
         """Access users resource."""
         if self._users is None:
@@ -65,5 +87,7 @@ __all__ = [
     "BillablePortfoliosResource",
     "ContactsResource",
     "ImportToolResource",
+    "RolesResource",
+    "TeamsResource",
     "UsersResource",
 ]
