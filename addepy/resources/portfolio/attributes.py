@@ -2,7 +2,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import AttributeOutputType, AttributeUsage, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -50,8 +50,8 @@ class AttributesResource(BaseResource):
         self,
         *,
         category: Optional[str] = None,
-        usage: Optional[str] = None,
-        output_type: Optional[str] = None,
+        usage: Optional[AttributeUsage] = None,
+        output_type: Optional[AttributeOutputType] = None,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """

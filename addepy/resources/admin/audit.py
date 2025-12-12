@@ -2,7 +2,12 @@
 import logging
 from typing import Any, Dict, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import (
+    AuditAction,
+    AuditObjectType,
+    AuditUserType,
+    DEFAULT_PAGE_LIMIT,
+)
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -35,12 +40,12 @@ class AuditResource(BaseResource):
 
     def _query_audit_logs(
         self,
-        object_type: str,
+        object_type: AuditObjectType,
         start_date: str,
         end_date: str,
         *,
-        actions: Optional[List[str]] = None,
-        user_type: Optional[str] = None,
+        actions: Optional[List[AuditAction]] = None,
+        user_type: Optional[AuditUserType] = None,
         users: Optional[List[str]] = None,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
@@ -125,7 +130,7 @@ class AuditResource(BaseResource):
         start_date: str,
         end_date: str,
         *,
-        user_type: Optional[str] = None,
+        user_type: Optional[AuditUserType] = None,
         users: Optional[List[str]] = None,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
@@ -168,8 +173,8 @@ class AuditResource(BaseResource):
         start_date: str,
         end_date: str,
         *,
-        actions: Optional[List[str]] = None,
-        user_type: Optional[str] = None,
+        actions: Optional[List[AuditAction]] = None,
+        user_type: Optional[AuditUserType] = None,
         users: Optional[List[str]] = None,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
@@ -214,8 +219,8 @@ class AuditResource(BaseResource):
         start_date: str,
         end_date: str,
         *,
-        actions: Optional[List[str]] = None,
-        user_type: Optional[str] = None,
+        actions: Optional[List[AuditAction]] = None,
+        user_type: Optional[AuditUserType] = None,
         users: Optional[List[str]] = None,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
@@ -260,8 +265,8 @@ class AuditResource(BaseResource):
         start_date: str,
         end_date: str,
         *,
-        actions: Optional[List[str]] = None,
-        user_type: Optional[str] = None,
+        actions: Optional[List[AuditAction]] = None,
+        user_type: Optional[AuditUserType] = None,
         users: Optional[List[str]] = None,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:

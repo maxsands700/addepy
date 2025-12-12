@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 
 import requests
 
+from ...constants import PortfolioType, TransactionOutputType, TransactionType
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -138,7 +139,7 @@ class TransactionsResource(BaseResource):
 
     def create_transaction(
         self,
-        transaction_type: str,
+        transaction_type: TransactionType,
         currency: str,
         trade_date: str,
         owner_id: str,
@@ -450,10 +451,10 @@ class TransactionsResource(BaseResource):
         self,
         view_id: str,
         portfolio_id: str,
-        portfolio_type: str,
+        portfolio_type: PortfolioType,
         start_date: str,
         end_date: str,
-        output_type: str = "CSV",
+        output_type: TransactionOutputType = "CSV",
     ) -> requests.Response:
         """
         Get transaction view results (synchronous).
@@ -492,7 +493,7 @@ class TransactionsResource(BaseResource):
     def query_transactions(
         self,
         columns: List[str],
-        portfolio_type: str,
+        portfolio_type: PortfolioType,
         portfolio_id: Union[str, List[str]],
         start_date: str,
         end_date: str,
