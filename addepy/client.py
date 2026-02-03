@@ -63,6 +63,10 @@ class AddePy:
         self._firm_id = firm_id or os.getenv("ADDEPAR_FIRM_ID")
         self._api_key = api_key or os.getenv("ADDEPAR_API_KEY")
 
+        # Normalize API key - strip "Basic " prefix if present
+        if self._api_key and self._api_key.startswith("Basic "):
+            self._api_key = self._api_key[6:]  # len("Basic ") == 6
+
         # Validate required configuration
         if not all([self._firm_name, self._firm_id, self._api_key]):
             missing = []

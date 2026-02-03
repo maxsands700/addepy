@@ -3,6 +3,7 @@
 Unofficial Python SDK for the Addepar API.
 
 ## Installation
+Create a `venv` for your Python project, and then install `addepy` with:
 
 ```bash
 pip install addepy
@@ -168,6 +169,27 @@ logging.getLogger("addepy").addHandler(logging.StreamHandler())
 
 Real-world automation examples for wealth management firms:
 
+### Bulk Imports
+
+```python
+import pandas as pd
+
+# Prepare transaction data
+attributes_df = pd.DataFrame({
+    "Entity ID": [11111111, 22222222, 33333333],
+    "Attribute Name": ["Portfolio Manager", "Trust Advisor", "Account Status"],
+    "Attribute Value": ["Michael Scott", "Dwight Schrute", "Closed"],
+})
+
+# Execute import with polling
+result = addepy.admin.import_tool.execute_import(
+    data=attributes_df,
+    import_type="ATTRIBUTES"
+)
+
+print(f"Imported {result['success_count']} transactions")
+```
+
 ### Audit & Compliance Monitoring
 
 ```python
@@ -178,7 +200,7 @@ from datetime import datetime, timedelta
 week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
 changes = addepy.admin.audit.query_attribute_changes(
     start_date=week_ago,
-    attribute_keys=["cost_basis", "value", "owner", "account_number"]
+    attribute_keys=["portfolio_manager"]
 )
 
 # 2. Flag changes for compliance review
@@ -240,30 +262,6 @@ for holding in current_holdings["data"]["attributes"]["total"]["children"]:
     asset_class = holding["name"]
     current_weight = holding["columns"]["weight"]
     # Compare to target and flag if drift > threshold
-```
-
-### Bulk Imports
-
-```python
-import pandas as pd
-
-# Prepare transaction data
-transactions_df = pd.DataFrame({
-    "Account": ["ABC-123", "ABC-123", "DEF-456"],
-    "Security": ["AAPL", "GOOGL", "MSFT"],
-    "Transaction Type": ["BUY", "BUY", "SELL"],
-    "Trade Date": ["2024-12-01", "2024-12-01", "2024-12-02"],
-    "Quantity": [100, 50, 75],
-    "Price": [150.00, 140.00, 380.00]
-})
-
-# Execute import with polling
-result = addepy.admin.import_tool.execute_import(
-    data=transactions_df,
-    import_type="TRANSACTIONS"
-)
-
-print(f"Imported {result['success_count']} transactions")
 ```
 
 ### Integration with External Systems (CRM, Custodians, Trading, etc.)
