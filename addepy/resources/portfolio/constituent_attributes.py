@@ -1,8 +1,8 @@
 """Constituent Attributes resource for the Addepar API."""
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Generator, List, Optional, Union
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -57,10 +57,40 @@ class ConstituentAttributesResource(BaseResource):
         logger.debug(f"Retrieved constituent attribute: {attribute_id}")
         return result
 
+    def iter_constituent_attributes(
+        self,
+        *,
+        asm_id: Optional[int] = None,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over constituent attributes lazily.
+
+        Args:
+            asm_id: Optional ASM ID to filter by.
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual constituent attribute resource objects.
+        """
+        params: Dict[str, Any] = {}
+        if asm_id is not None:
+            params["asmId"] = asm_id
+
+        return self._paginate(
+            "/constituent_attributes",
+            page_limit=page_limit,
+            params=params if params else None,
+            max_items=limit,
+        )
+
     def list_constituent_attributes(
         self,
         *,
         asm_id: Optional[int] = None,
+        limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """
@@ -68,6 +98,8 @@ class ConstituentAttributesResource(BaseResource):
 
         Args:
             asm_id: Optional ASM ID to filter by.
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_constituent_attributes() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
@@ -82,17 +114,16 @@ class ConstituentAttributesResource(BaseResource):
                 asm_id=123456
             )
         """
-        params: Dict[str, Any] = {}
-        if asm_id is not None:
-            params["asmId"] = asm_id
-
-        attributes = list(
-            self._paginate(
-                "/constituent_attributes",
-                page_limit=page_limit,
-                params=params if params else None,
+        attributes = list(self.iter_constituent_attributes(
+            asm_id=asm_id,
+            limit=limit,
+            page_limit=page_limit,
+        ))
+        if len(attributes) == limit:
+            logger.warning(
+                f"list_constituent_attributes() returned {limit} items (limit reached). "
+                f"Use iter_constituent_attributes() for full results or pass a higher limit."
             )
-        )
         logger.debug(f"Listed {len(attributes)} constituent attributes")
         return attributes
 

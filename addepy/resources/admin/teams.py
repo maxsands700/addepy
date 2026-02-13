@@ -1,8 +1,8 @@
 """Teams resource for the Addepar API."""
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -50,30 +50,56 @@ class TeamsResource(BaseResource):
         logger.debug(f"Retrieved team {team_id}")
         return team
 
-    def list_teams(
+    def iter_teams(
         self,
         *,
-        page_limit: int = DEFAULT_PAGE_LIMIT,
         ids: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
         """
-        List all teams with pagination and optional filters.
+        Iterate over teams lazily with optional filters.
 
         Args:
-            page_limit: Results per page (default: 500, max: 2000).
             ids: Filter by specific team IDs (comma-separated).
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
 
-        Returns:
-            List of team resource objects.
+        Yields:
+            Individual team resource objects.
         """
         params: Dict[str, Any] = {}
 
         if ids is not None:
             params["filter[id]"] = ids
 
-        teams = list(
-            self._paginate("/teams", page_limit=page_limit, params=params if params else None)
-        )
+        return self._paginate("/teams", page_limit=page_limit, params=params if params else None, max_items=limit)
+
+    def list_teams(
+        self,
+        *,
+        ids: Optional[str] = None,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> List[Dict[str, Any]]:
+        """
+        List all teams with pagination and optional filters.
+
+        Args:
+            ids: Filter by specific team IDs (comma-separated).
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_teams() for unbounded iteration.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Returns:
+            List of team resource objects.
+        """
+        teams = list(self.iter_teams(ids=ids, limit=limit, page_limit=page_limit))
+        if len(teams) == limit:
+            logger.warning(
+                f"list_teams() returned {limit} items (limit reached). "
+                f"Use iter_teams() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(teams)} teams")
         return teams
 

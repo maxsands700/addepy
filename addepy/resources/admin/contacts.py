@@ -1,8 +1,8 @@
 """Contacts resource for the Addepar API."""
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -78,17 +78,47 @@ class ContactsResource(BaseResource):
         logger.debug(f"Retrieved contact {contact_id}")
         return contact
 
-    def list_contacts(self, *, page_limit: int = DEFAULT_PAGE_LIMIT) -> List[Dict[str, Any]]:
+    def iter_contacts(
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over contacts lazily.
+
+        Args:
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual contact resource objects.
+        """
+        return self._paginate("/contacts", page_limit=page_limit, max_items=limit)
+
+    def list_contacts(
+        self,
+        *,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> List[Dict[str, Any]]:
         """
         List all contacts with pagination.
 
         Args:
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_contacts() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
             List of contact resource objects.
         """
-        contacts = list(self._paginate("/contacts", page_limit=page_limit))
+        contacts = list(self.iter_contacts(limit=limit, page_limit=page_limit))
+        if len(contacts) == limit:
+            logger.warning(
+                f"list_contacts() returned {limit} items (limit reached). "
+                f"Use iter_contacts() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(contacts)} contacts")
         return contacts
 

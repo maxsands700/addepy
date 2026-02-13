@@ -1,8 +1,8 @@
 """Roles resource for the Addepar API."""
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, Generator, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -49,21 +49,47 @@ class RolesResource(BaseResource):
         logger.debug(f"Retrieved role {role_id}")
         return role
 
+    def iter_roles(
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over roles lazily.
+
+        Args:
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual role resource objects.
+        """
+        return self._paginate("/roles", page_limit=page_limit, max_items=limit)
+
     def list_roles(
         self,
         *,
+        limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """
         List all roles with pagination.
 
         Args:
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_roles() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
             List of role resource objects.
         """
-        roles = list(self._paginate("/roles", page_limit=page_limit))
+        roles = list(self.iter_roles(limit=limit, page_limit=page_limit))
+        if len(roles) == limit:
+            logger.warning(
+                f"list_roles() returned {limit} items (limit reached). "
+                f"Use iter_roles() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(roles)} roles")
         return roles
 
@@ -87,10 +113,31 @@ class RolesResource(BaseResource):
         logger.debug(f"Retrieved {len(users)} assigned users for role {role_id}")
         return users
 
+    def iter_assigned_user_details(
+        self,
+        role_id: str,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over full user details for users assigned to a role lazily.
+
+        Args:
+            role_id: The ID of the role.
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual user resource objects with full attributes.
+        """
+        return self._paginate(f"/roles/{role_id}/assigned_users", page_limit=page_limit, max_items=limit)
+
     def get_assigned_user_details(
         self,
         role_id: str,
         *,
+        limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """
@@ -98,14 +145,19 @@ class RolesResource(BaseResource):
 
         Args:
             role_id: The ID of the role.
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_assigned_user_details() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
             List of user resource objects with full attributes.
         """
-        users = list(
-            self._paginate(f"/roles/{role_id}/assigned_users", page_limit=page_limit)
-        )
+        users = list(self.iter_assigned_user_details(role_id, limit=limit, page_limit=page_limit))
+        if len(users) == limit:
+            logger.warning(
+                f"get_assigned_user_details() returned {limit} items (limit reached). "
+                f"Use iter_assigned_user_details() for full results or pass a higher limit."
+            )
         logger.debug(f"Retrieved details for {len(users)} users assigned to role {role_id}")
         return users
 

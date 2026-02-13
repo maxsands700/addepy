@@ -175,6 +175,7 @@ class BaseResource:
             *,
             params: Optional[Dict[str, Any]] = None,
             page_limit: int = DEFAULT_PAGE_LIMIT,
+            max_items: Optional[int] = None,
         ) -> Generator[Dict[str, Any], None, None]:
         """
         Auto-paginate through all results from a paginated endpoint.
@@ -186,6 +187,7 @@ class BaseResource:
             endpoint: API endpoint (e.g., "/entities")
             params: Additional query parameters (filters, etc.)
             page_limit: Results per page (default: 500, max: 2000)
+            max_items: Maximum number of items to yield. None means no limit.
 
         Yields:
             Individual resource objects from the 'data' array
@@ -217,6 +219,9 @@ class BaseResource:
             for item in items:
                 total_items += 1
                 yield item
+                if max_items is not None and total_items >= max_items:
+                    logger.debug(f"Reached max_items limit ({max_items}), stopping pagination")
+                    return
 
             logger.debug(f"Page {page_number}: fetched {len(items)} items")
 
@@ -249,6 +254,7 @@ class BaseResource:
             *,
             params: Optional[Dict[str, Any]] = None,
             page_size: int = 50,
+            max_items: Optional[int] = None,
         ) -> Generator[Dict[str, Any], None, None]:
         """
         Auto-paginate through all results using offset-based pagination.
@@ -260,6 +266,7 @@ class BaseResource:
             endpoint: API endpoint (e.g., "/generated_reports")
             params: Additional query parameters (filters, etc.)
             page_size: Results per page (default: 50)
+            max_items: Maximum number of items to yield. None means no limit.
 
         Yields:
             Individual resource objects from the 'data' array
@@ -293,6 +300,9 @@ class BaseResource:
             for item in items:
                 total_items += 1
                 yield item
+                if max_items is not None and total_items >= max_items:
+                    logger.debug(f"Reached max_items limit ({max_items}), stopping pagination")
+                    return
 
             logger.debug(f"Page {page_number}: fetched {len(items)} items")
 

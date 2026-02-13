@@ -1,8 +1,8 @@
 """Users resource for the Addepar API."""
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT, LoginMethod
+from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT, LoginMethod
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -56,17 +56,47 @@ class UsersResource(BaseResource):
         logger.debug(f"Retrieved user {user_id}")
         return user
 
-    def list_users(self, *, page_limit: int = DEFAULT_PAGE_LIMIT) -> List[Dict[str, Any]]:
+    def iter_users(
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over users lazily.
+
+        Args:
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual user resource objects.
+        """
+        return self._paginate("/users", page_limit=page_limit, max_items=limit)
+
+    def list_users(
+        self,
+        *,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> List[Dict[str, Any]]:
         """
         List all users with pagination.
 
         Args:
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_users() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
             List of user resource objects.
         """
-        users = list(self._paginate("/users", page_limit=page_limit))
+        users = list(self.iter_users(limit=limit, page_limit=page_limit))
+        if len(users) == limit:
+            logger.warning(
+                f"list_users() returned {limit} items (limit reached). "
+                f"Use iter_users() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(users)} users")
         return users
 

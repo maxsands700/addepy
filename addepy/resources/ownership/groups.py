@@ -1,8 +1,8 @@
 """Groups resource for the Addepar API."""
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -66,31 +66,33 @@ class GroupsResource(BaseResource):
         logger.debug(f"Retrieved group {group_id}")
         return group
 
-    def list_groups(
+    def iter_groups(
         self,
         *,
-        page_limit: int = DEFAULT_PAGE_LIMIT,
         group_types: Optional[str] = None,
         ids: Optional[str] = None,
         created_before: Optional[str] = None,
         created_after: Optional[str] = None,
         modified_before: Optional[str] = None,
         modified_after: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
         """
-        List all groups with pagination and optional filters.
+        Iterate over groups lazily with optional filters.
 
         Args:
-            page_limit: Results per page (default: 500, max: 2000).
             group_types: Filter by group type ID.
             ids: Filter by specific group IDs (comma-separated).
             created_before: Groups created on/before date (YYYY-MM-DD).
             created_after: Groups created on/after date (YYYY-MM-DD).
             modified_before: Groups modified on/before date (YYYY-MM-DD).
             modified_after: Groups modified on/after date (YYYY-MM-DD).
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
 
-        Returns:
-            List of group resource objects.
+        Yields:
+            Individual group resource objects.
         """
         params: Dict[str, Any] = {}
 
@@ -107,9 +109,52 @@ class GroupsResource(BaseResource):
         if modified_after is not None:
             params["filter[modified_after]"] = modified_after
 
-        groups = list(
-            self._paginate("/groups", page_limit=page_limit, params=params if params else None)
-        )
+        return self._paginate("/groups", page_limit=page_limit, params=params if params else None, max_items=limit)
+
+    def list_groups(
+        self,
+        *,
+        group_types: Optional[str] = None,
+        ids: Optional[str] = None,
+        created_before: Optional[str] = None,
+        created_after: Optional[str] = None,
+        modified_before: Optional[str] = None,
+        modified_after: Optional[str] = None,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> List[Dict[str, Any]]:
+        """
+        List all groups with pagination and optional filters.
+
+        Args:
+            group_types: Filter by group type ID.
+            ids: Filter by specific group IDs (comma-separated).
+            created_before: Groups created on/before date (YYYY-MM-DD).
+            created_after: Groups created on/after date (YYYY-MM-DD).
+            modified_before: Groups modified on/before date (YYYY-MM-DD).
+            modified_after: Groups modified on/after date (YYYY-MM-DD).
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_groups() for unbounded iteration.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Returns:
+            List of group resource objects.
+        """
+        groups = list(self.iter_groups(
+            group_types=group_types,
+            ids=ids,
+            created_before=created_before,
+            created_after=created_after,
+            modified_before=modified_before,
+            modified_after=modified_after,
+            limit=limit,
+            page_limit=page_limit,
+        ))
+        if len(groups) == limit:
+            logger.warning(
+                f"list_groups() returned {limit} items (limit reached). "
+                f"Use iter_groups() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(groups)} groups")
         return groups
 
@@ -378,10 +423,31 @@ class GroupsResource(BaseResource):
         logger.debug(f"Retrieved {len(members)} members for group {group_id}")
         return members
 
+    def iter_member_details(
+        self,
+        group_id: str,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over full entity details for group members lazily.
+
+        Args:
+            group_id: The ID of the group.
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual entity resource objects with full attributes.
+        """
+        return self._paginate(f"/groups/{group_id}/members", page_limit=page_limit, max_items=limit)
+
     def get_member_details(
         self,
         group_id: str,
         *,
+        limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """
@@ -389,14 +455,19 @@ class GroupsResource(BaseResource):
 
         Args:
             group_id: The ID of the group.
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_member_details() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
             List of entity resource objects with full attributes.
         """
-        members = list(
-            self._paginate(f"/groups/{group_id}/members", page_limit=page_limit)
-        )
+        members = list(self.iter_member_details(group_id, limit=limit, page_limit=page_limit))
+        if len(members) == limit:
+            logger.warning(
+                f"get_member_details() returned {limit} items (limit reached). "
+                f"Use iter_member_details() for full results or pass a higher limit."
+            )
         logger.debug(f"Retrieved details for {len(members)} members of group {group_id}")
         return members
 
@@ -458,10 +529,31 @@ class GroupsResource(BaseResource):
     # Child Group Methods
     # =========================================================================
 
+    def iter_child_groups(
+        self,
+        group_id: str,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over a group's child groups lazily.
+
+        Args:
+            group_id: The ID of the group.
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual child group resource objects with full attributes.
+        """
+        return self._paginate(f"/groups/{group_id}/child_groups", page_limit=page_limit, max_items=limit)
+
     def get_child_groups(
         self,
         group_id: str,
         *,
+        limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """
@@ -469,14 +561,19 @@ class GroupsResource(BaseResource):
 
         Args:
             group_id: The ID of the group.
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_child_groups() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
             List of child group resource objects with full attributes.
         """
-        child_groups = list(
-            self._paginate(f"/groups/{group_id}/child_groups", page_limit=page_limit)
-        )
+        child_groups = list(self.iter_child_groups(group_id, limit=limit, page_limit=page_limit))
+        if len(child_groups) == limit:
+            logger.warning(
+                f"get_child_groups() returned {limit} items (limit reached). "
+                f"Use iter_child_groups() for full results or pass a higher limit."
+            )
         logger.debug(f"Retrieved {len(child_groups)} child groups for group {group_id}")
         return child_groups
 

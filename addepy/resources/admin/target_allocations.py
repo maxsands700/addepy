@@ -1,8 +1,8 @@
 """Target Allocations resource for the Addepar API."""
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -51,22 +51,48 @@ class TargetAllocationsResource(BaseResource):
         logger.debug(f"Retrieved allocation model {model_id}")
         return model
 
+    def iter_allocation_models(
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over allocation models lazily.
+
+        Args:
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual allocation model resource objects.
+        """
+        return self._paginate("/allocation_models", page_limit=page_limit, max_items=limit)
+
     def list_allocation_models(
         self,
         *,
+        limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """
         List all allocation models.
 
         Args:
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_allocation_models() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
             List of allocation model resource objects containing id, type,
             and attributes (name, attribute_ids).
         """
-        models = list(self._paginate("/allocation_models", page_limit=page_limit))
+        models = list(self.iter_allocation_models(limit=limit, page_limit=page_limit))
+        if len(models) == limit:
+            logger.warning(
+                f"list_allocation_models() returned {limit} items (limit reached). "
+                f"Use iter_allocation_models() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(models)} allocation models")
         return models
 
@@ -189,24 +215,48 @@ class TargetAllocationsResource(BaseResource):
         logger.debug(f"Retrieved allocation template {template_id}")
         return template
 
+    def iter_allocation_templates(
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over allocation templates lazily.
+
+        Args:
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual allocation template resource objects.
+        """
+        return self._paginate("/allocation_templates", page_limit=page_limit, max_items=limit)
+
     def list_allocation_templates(
         self,
         *,
+        limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """
         List all allocation templates.
 
         Args:
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_allocation_templates() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
             List of allocation template resource objects containing id, type,
             and attributes (model_id, name, description, allocation_intervals).
         """
-        templates = list(
-            self._paginate("/allocation_templates", page_limit=page_limit)
-        )
+        templates = list(self.iter_allocation_templates(limit=limit, page_limit=page_limit))
+        if len(templates) == limit:
+            logger.warning(
+                f"list_allocation_templates() returned {limit} items (limit reached). "
+                f"Use iter_allocation_templates() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(templates)} allocation templates")
         return templates
 

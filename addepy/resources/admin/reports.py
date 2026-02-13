@@ -1,8 +1,8 @@
 """Reports resource for the Addepar API."""
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -33,10 +33,9 @@ class ReportsResource(BaseResource):
     # Report List Methods
     # =========================================================================
 
-    def list_reports(
+    def iter_reports(
         self,
         *,
-        page_limit: int = DEFAULT_PAGE_LIMIT,
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         modified_after: Optional[str] = None,
@@ -44,12 +43,13 @@ class ReportsResource(BaseResource):
         name: Optional[str] = None,
         entity_id: Optional[str] = None,
         group_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
         """
-        List all report definitions with optional filters.
+        Iterate over report definitions lazily with optional filters.
 
         Args:
-            page_limit: Results per page (default: 500, max: 2000).
             created_after: Reports created after timestamp (ISO 8601).
             created_before: Reports created before timestamp (ISO 8601).
             modified_after: Reports modified after timestamp (ISO 8601).
@@ -57,11 +57,11 @@ class ReportsResource(BaseResource):
             name: Filter by report name (substring match).
             entity_id: Filter by associated entity ID.
             group_id: Filter by associated group ID.
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
 
-        Returns:
-            List of report resource objects containing id, type, and attributes
-            (report_id, report_name, created_on_date, last_update_date,
-            num_associated_portfolios).
+        Yields:
+            Individual report resource objects.
         """
         params: Dict[str, Any] = {}
 
@@ -80,9 +80,57 @@ class ReportsResource(BaseResource):
         if group_id is not None:
             params["filter[groupId]"] = group_id
 
-        reports = list(
-            self._paginate("/reports", page_limit=page_limit, params=params if params else None)
-        )
+        return self._paginate("/reports", page_limit=page_limit, params=params if params else None, max_items=limit)
+
+    def list_reports(
+        self,
+        *,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+        modified_after: Optional[str] = None,
+        modified_before: Optional[str] = None,
+        name: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        group_id: Optional[str] = None,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> List[Dict[str, Any]]:
+        """
+        List all report definitions with optional filters.
+
+        Args:
+            created_after: Reports created after timestamp (ISO 8601).
+            created_before: Reports created before timestamp (ISO 8601).
+            modified_after: Reports modified after timestamp (ISO 8601).
+            modified_before: Reports modified before timestamp (ISO 8601).
+            name: Filter by report name (substring match).
+            entity_id: Filter by associated entity ID.
+            group_id: Filter by associated group ID.
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_reports() for full results or pass a higher limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Returns:
+            List of report resource objects containing id, type, and attributes
+            (report_id, report_name, created_on_date, last_update_date,
+            num_associated_portfolios).
+        """
+        reports = list(self.iter_reports(
+            created_after=created_after,
+            created_before=created_before,
+            modified_after=modified_after,
+            modified_before=modified_before,
+            name=name,
+            entity_id=entity_id,
+            group_id=group_id,
+            limit=limit,
+            page_limit=page_limit,
+        ))
+        if len(reports) == limit:
+            logger.warning(
+                f"list_reports() returned {limit} items (limit reached). "
+                f"Use iter_reports() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(reports)} reports")
         return reports
 
@@ -183,30 +231,32 @@ class ReportsResource(BaseResource):
         logger.debug(f"Retrieved generated report {job_id}")
         return report
 
-    def list_generated_reports(
+    def iter_generated_reports(
         self,
         *,
-        page_size: int = 50,
         completed_after: Optional[str] = None,
         completed_before: Optional[str] = None,
         status: Optional[str] = None,
         entity_id: Optional[str] = None,
         group_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        limit: Optional[int] = None,
+        page_size: int = 50,
+    ) -> Generator[Dict[str, Any], None, None]:
         """
-        List all generated reports with optional filters.
+        Iterate over generated reports lazily with optional filters.
 
         Args:
-            page_size: Results per page (default: 50).
             completed_after: Reports completed after timestamp (ISO 8601).
             completed_before: Reports completed before timestamp (ISO 8601).
             status: Filter by status - comma-separated list of "FINISHED",
                 "ERROR", and/or "CANCELED".
             entity_id: Filter by portfolio entity ID.
             group_id: Filter by portfolio group ID.
+            limit: Maximum number of items to yield. None means no limit.
+            page_size: Results per page (default: 50).
 
-        Returns:
-            List of generated report resource objects sorted in reverse
+        Yields:
+            Individual generated report resource objects sorted in reverse
             chronological order of completion time.
         """
         params: Dict[str, Any] = {}
@@ -222,11 +272,53 @@ class ReportsResource(BaseResource):
         if group_id is not None:
             params["filter[groupId]"] = group_id
 
-        reports = list(
-            self._paginate_offset(
-                "/generated_reports", page_size=page_size, params=params if params else None
-            )
+        return self._paginate_offset(
+            "/generated_reports", page_size=page_size, params=params if params else None, max_items=limit
         )
+
+    def list_generated_reports(
+        self,
+        *,
+        completed_after: Optional[str] = None,
+        completed_before: Optional[str] = None,
+        status: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        group_id: Optional[str] = None,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_size: int = 50,
+    ) -> List[Dict[str, Any]]:
+        """
+        List all generated reports with optional filters.
+
+        Args:
+            completed_after: Reports completed after timestamp (ISO 8601).
+            completed_before: Reports completed before timestamp (ISO 8601).
+            status: Filter by status - comma-separated list of "FINISHED",
+                "ERROR", and/or "CANCELED".
+            entity_id: Filter by portfolio entity ID.
+            group_id: Filter by portfolio group ID.
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_generated_reports() for unbounded iteration.
+            page_size: Results per page (default: 50).
+
+        Returns:
+            List of generated report resource objects sorted in reverse
+            chronological order of completion time.
+        """
+        reports = list(self.iter_generated_reports(
+            completed_after=completed_after,
+            completed_before=completed_before,
+            status=status,
+            entity_id=entity_id,
+            group_id=group_id,
+            limit=limit,
+            page_size=page_size,
+        ))
+        if len(reports) == limit:
+            logger.warning(
+                f"list_generated_reports() returned {limit} items (limit reached). "
+                f"Use iter_generated_reports() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(reports)} generated reports")
         return reports
 

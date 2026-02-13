@@ -1,8 +1,8 @@
 """Benchmarks resource for the Addepar API."""
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
-from ...constants import BenchmarkType, DEFAULT_PAGE_LIMIT, MatchingType
+from ...constants import BenchmarkType, DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT, MatchingType
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -85,21 +85,47 @@ class BenchmarksResource(BaseResource):
         logger.debug(f"Retrieved benchmark {benchmark_id}")
         return benchmark
 
+    def iter_benchmarks(
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over benchmarks lazily.
+
+        Args:
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual benchmark resource objects.
+        """
+        return self._paginate("/benchmarks", page_limit=page_limit, max_items=limit)
+
     def list_benchmarks(
         self,
         *,
+        limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """
         List all active benchmarks with pagination.
 
         Args:
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_benchmarks() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
             List of benchmark resource objects.
         """
-        benchmarks = list(self._paginate("/benchmarks", page_limit=page_limit))
+        benchmarks = list(self.iter_benchmarks(limit=limit, page_limit=page_limit))
+        if len(benchmarks) == limit:
+            logger.warning(
+                f"list_benchmarks() returned {limit} items (limit reached). "
+                f"Use iter_benchmarks() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(benchmarks)} benchmarks")
         return benchmarks
 
@@ -301,23 +327,47 @@ class BenchmarksResource(BaseResource):
         logger.debug(f"Retrieved benchmark composition {composition_id}")
         return composition
 
+    def iter_benchmark_compositions(
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over benchmark compositions lazily.
+
+        Args:
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual composition resource objects.
+        """
+        return self._paginate("/benchmark_compositions", page_limit=page_limit, max_items=limit)
+
     def list_benchmark_compositions(
         self,
         *,
+        limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """
         List all benchmark compositions with pagination.
 
         Args:
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_benchmark_compositions() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
             List of composition resource objects.
         """
-        compositions = list(
-            self._paginate("/benchmark_compositions", page_limit=page_limit)
-        )
+        compositions = list(self.iter_benchmark_compositions(limit=limit, page_limit=page_limit))
+        if len(compositions) == limit:
+            logger.warning(
+                f"list_benchmark_compositions() returned {limit} items (limit reached). "
+                f"Use iter_benchmark_compositions() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(compositions)} benchmark compositions")
         return compositions
 
@@ -449,23 +499,47 @@ class BenchmarksResource(BaseResource):
         logger.debug(f"Retrieved benchmark association strategy {strategy_id}")
         return strategy
 
+    def iter_benchmark_association_strategies(
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over benchmark association strategies lazily.
+
+        Args:
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 500).
+
+        Yields:
+            Individual strategy resource objects.
+        """
+        return self._paginate("/benchmark_associations_strategies", page_limit=page_limit, max_items=limit)
+
     def list_benchmark_association_strategies(
         self,
         *,
+        limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """
         List all benchmark associations strategies with pagination.
 
         Args:
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_benchmark_association_strategies() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 500).
 
         Returns:
             List of strategy resource objects.
         """
-        strategies = list(
-            self._paginate("/benchmark_associations_strategies", page_limit=page_limit)
-        )
+        strategies = list(self.iter_benchmark_association_strategies(limit=limit, page_limit=page_limit))
+        if len(strategies) == limit:
+            logger.warning(
+                f"list_benchmark_association_strategies() returned {limit} items (limit reached). "
+                f"Use iter_benchmark_association_strategies() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(strategies)} benchmark association strategies")
         return strategies
 
