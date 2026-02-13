@@ -11,6 +11,9 @@ DEFAULT_TIMEOUT: float = 1200.0  # 20 minutes
 DEFAULT_PAGE_LIMIT: int = 500
 MAX_PAGE_LIMIT: int = 2000
 
+# HTTP request timeout: (connect_timeout, read_timeout) in seconds
+DEFAULT_REQUEST_TIMEOUT = (10, 60)
+
 # Import job completed statuses (stops polling)
 IMPORT_COMPLETED_STATUSES: Set[str] = {
     "ERRORS_READY_FOR_REVIEW",

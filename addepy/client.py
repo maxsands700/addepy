@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING, Any, Dict, Optional
 import requests
 from dotenv import load_dotenv
 
-from .constants import DEFAULT_CONTENT_TYPE
+from .constants import DEFAULT_CONTENT_TYPE, DEFAULT_REQUEST_TIMEOUT
 from .exceptions import (
     AddePyError,
     AuthenticationError,
@@ -164,6 +164,7 @@ class AddePy:
             data=data,
             params=params,
             headers=headers,
+            timeout=kwargs.pop("timeout", DEFAULT_REQUEST_TIMEOUT),
             **kwargs,
         )
 
