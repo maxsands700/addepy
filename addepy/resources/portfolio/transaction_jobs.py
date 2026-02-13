@@ -1,12 +1,13 @@
 """Transaction Jobs resource for the Addepar API."""
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Generator, List, Optional, Union
 
 import requests
 
 from ...constants import (
     DEFAULT_BACKOFF_FACTOR,
     DEFAULT_INITIAL_WAIT,
+    DEFAULT_LIST_LIMIT,
     DEFAULT_MAX_WAIT,
     DEFAULT_PAGE_LIMIT,
     DEFAULT_TIMEOUT,
@@ -261,17 +262,47 @@ class TransactionJobsResource(BaseResource):
         logger.debug(f"Downloading results for transaction job {job_id}")
         return self._get(f"/transaction_jobs/{job_id}/download")
 
-    def list_jobs(self, *, page_limit: int = DEFAULT_PAGE_LIMIT) -> List[Dict[str, Any]]:
+    def iter_jobs(
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over transaction jobs lazily.
+
+        Args:
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual transaction job resource objects.
+        """
+        return self._paginate("/transaction_jobs", page_limit=page_limit, max_items=limit)
+
+    def list_jobs(
+        self,
+        *,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> List[Dict[str, Any]]:
         """
         List all transaction jobs with pagination.
 
         Args:
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_jobs() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
             List of transaction job resource objects.
         """
-        jobs = list(self._paginate("/transaction_jobs", page_limit=page_limit))
+        jobs = list(self.iter_jobs(limit=limit, page_limit=page_limit))
+        if len(jobs) == limit:
+            logger.warning(
+                f"list_jobs() returned {limit} items (limit reached). "
+                f"Use iter_jobs() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(jobs)} transaction jobs")
         return jobs
 

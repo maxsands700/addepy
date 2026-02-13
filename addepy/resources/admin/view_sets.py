@@ -1,8 +1,8 @@
 """View Sets resource for the Addepar API."""
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, Generator, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -44,15 +44,36 @@ class ViewSetsResource(BaseResource):
         logger.debug(f"Retrieved view set {view_set_id}")
         return view_set
 
+    def iter_view_sets(
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over view sets lazily.
+
+        Args:
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual view set resource objects.
+        """
+        return self._paginate("/view_sets", page_limit=page_limit, max_items=limit)
+
     def list_view_sets(
         self,
         *,
+        limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """
         List all view sets.
 
         Args:
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_view_sets() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
@@ -64,6 +85,11 @@ class ViewSetsResource(BaseResource):
             for vs in view_sets:
                 print(f"{vs['id']}: {vs['attributes']['name']}")
         """
-        view_sets = list(self._paginate("/view_sets", page_limit=page_limit))
+        view_sets = list(self.iter_view_sets(limit=limit, page_limit=page_limit))
+        if len(view_sets) == limit:
+            logger.warning(
+                f"list_view_sets() returned {limit} items (limit reached). "
+                f"Use iter_view_sets() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(view_sets)} view sets")
         return view_sets

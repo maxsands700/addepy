@@ -141,6 +141,44 @@ results = addepy.portfolio.jobs.execute_portfolio_query(query_dict)
 
 Use Tier 1 when you need fine-grained control. Use Tier 2 for convenience.
 
+### Pagination: `list_*` vs `iter_*`
+
+Every paginated endpoint has two methods:
+
+| Method   | Returns     | Default limit | Use when...                              |
+| -------- | ----------- | ------------- | ---------------------------------------- |
+| `list_*` | `list`      | 10,000        | You need all results in memory at once   |
+| `iter_*` | `Generator` | No limit      | You want to process items one at a time  |
+
+**`list_*`** fetches pages behind the scenes and returns a plain list. It caps results at 10,000 by default to prevent runaway API calls, and logs a warning if the cap is hit.
+
+```python
+# Returns up to 10,000 entities as a list
+entities = addepy.ownership.entities.list_entities()
+
+# Override the default limit
+entities = addepy.ownership.entities.list_entities(limit=50_000)
+```
+
+**`iter_*`** returns a lazy generator that yields one item at a time, only fetching the next page when needed. This keeps memory usage constant regardless of result size and gives you full control over when to stop.
+
+```python
+# Process entities one at a time - memory-efficient for large datasets
+for entity in addepy.ownership.entities.iter_entities():
+    process(entity)
+
+# Stop early whenever you want
+for entity in addepy.ownership.entities.iter_entities():
+    if found_what_i_need(entity):
+        break
+
+# Cap results on the iterator too
+for entity in addepy.ownership.entities.iter_entities(limit=100):
+    process(entity)
+```
+
+Use `list_*` for small-to-medium datasets where you need random access or the full list. Use `iter_*` when working with large datasets or when you want to process results as they arrive.
+
 ## Error Handling
 
 ```python

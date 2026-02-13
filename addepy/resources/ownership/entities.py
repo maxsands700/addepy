@@ -1,9 +1,9 @@
 """Entities resource for the Addepar API."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT, UnderlyingType
+from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT, UnderlyingType
 from ...exceptions import AddePyError
 from ..base import BaseResource
 
@@ -49,7 +49,7 @@ class EntitiesResource(BaseResource):
         logger.debug(f"Retrieved entity {entity_id}")
         return entity
 
-    def list_entities(
+    def iter_entities(
         self,
         *,
         model_types: Optional[List[str]] = None,
@@ -60,10 +60,11 @@ class EntitiesResource(BaseResource):
         modified_after: Optional[str] = None,
         ids: Optional[List[str]] = None,
         fields: Optional[List[str]] = None,
+        limit: Optional[int] = None,
         page_limit: int = DEFAULT_PAGE_LIMIT,
-    ) -> List[Dict[str, Any]]:
+    ) -> Generator[Dict[str, Any], None, None]:
         """
-        List all entities with optional filtering and pagination.
+        Iterate over entities lazily with optional filtering.
 
         Args:
             model_types: Filter by model types (e.g., ["TRUST", "FINANCIAL_ACCOUNT"]).
@@ -74,10 +75,11 @@ class EntitiesResource(BaseResource):
             modified_after: Filter by modification date (YYYY-MM-DD).
             ids: Filter by specific entity IDs.
             fields: Specific attributes to return (e.g., ["original_name", "model_type"]).
+            limit: Maximum number of items to yield. None means no limit.
             page_limit: Results per page (default: 500, max: 2000).
 
-        Returns:
-            List of entity resource objects.
+        Yields:
+            Individual entity resource objects.
         """
         params: Dict[str, Any] = {}
 
@@ -98,7 +100,58 @@ class EntitiesResource(BaseResource):
         if fields is not None:
             params["fields[entities]"] = ",".join(fields) if fields else "[]"
 
-        entities = list(self._paginate("/entities", params=params, page_limit=page_limit))
+        return self._paginate("/entities", params=params, page_limit=page_limit, max_items=limit)
+
+    def list_entities(
+        self,
+        *,
+        model_types: Optional[List[str]] = None,
+        linking_status: Optional[str] = None,
+        created_before: Optional[str] = None,
+        created_after: Optional[str] = None,
+        modified_before: Optional[str] = None,
+        modified_after: Optional[str] = None,
+        ids: Optional[List[str]] = None,
+        fields: Optional[List[str]] = None,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> List[Dict[str, Any]]:
+        """
+        List all entities with optional filtering and pagination.
+
+        Args:
+            model_types: Filter by model types (e.g., ["TRUST", "FINANCIAL_ACCOUNT"]).
+            linking_status: Filter by linking status ("linked" or "unlinked").
+            created_before: Filter by creation date (YYYY-MM-DD).
+            created_after: Filter by creation date (YYYY-MM-DD).
+            modified_before: Filter by modification date (YYYY-MM-DD).
+            modified_after: Filter by modification date (YYYY-MM-DD).
+            ids: Filter by specific entity IDs.
+            fields: Specific attributes to return (e.g., ["original_name", "model_type"]).
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_entities() for unbounded iteration.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Returns:
+            List of entity resource objects.
+        """
+        entities = list(self.iter_entities(
+            model_types=model_types,
+            linking_status=linking_status,
+            created_before=created_before,
+            created_after=created_after,
+            modified_before=modified_before,
+            modified_after=modified_after,
+            ids=ids,
+            fields=fields,
+            limit=limit,
+            page_limit=page_limit,
+        ))
+        if len(entities) == limit:
+            logger.warning(
+                f"list_entities() returned {limit} items (limit reached). "
+                f"Use iter_entities() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(entities)} entities")
         return entities
 

@@ -10,6 +10,7 @@ DEFAULT_TIMEOUT: float = 1200.0  # 20 minutes
 # Pagination defaults
 DEFAULT_PAGE_LIMIT: int = 500
 MAX_PAGE_LIMIT: int = 2000
+DEFAULT_LIST_LIMIT: int = 10_000
 
 # HTTP request timeout: (connect_timeout, read_timeout) in seconds
 DEFAULT_REQUEST_TIMEOUT = (10, 60)

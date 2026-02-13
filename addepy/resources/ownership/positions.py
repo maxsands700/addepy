@@ -1,9 +1,9 @@
 """Positions resource for the Addepar API."""
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -60,7 +60,7 @@ class PositionsResource(BaseResource):
         logger.debug(f"Retrieved position {position_id}")
         return position
 
-    def list_positions(
+    def iter_positions(
         self,
         *,
         fields: Optional[List[str]] = None,
@@ -72,39 +72,27 @@ class PositionsResource(BaseResource):
         owned_model_types: Optional[List[str]] = None,
         owner_entity_id: Optional[List[str]] = None,
         owned_entity_id: Optional[List[str]] = None,
+        limit: Optional[int] = None,
         page_limit: int = DEFAULT_PAGE_LIMIT,
-    ) -> List[Dict[str, Any]]:
+    ) -> Generator[Dict[str, Any], None, None]:
         """
-        List all positions with optional filtering and pagination.
+        Iterate over positions lazily with optional filtering.
 
         Args:
             fields: Specific attributes to return (e.g., ["name", "incepting_open_position_date"]).
-                Use empty list [] to omit all attributes.
             created_before: Filter positions created on/before date (YYYY-MM-DD).
             created_after: Filter positions created on/after date (YYYY-MM-DD).
             modified_before: Filter positions modified on/before date (YYYY-MM-DD).
             modified_after: Filter positions modified on/after date (YYYY-MM-DD).
-            owner_model_types: Filter by owner entity model types (e.g., ["PERSON_NODE", "TRUST"]).
-            owned_model_types: Filter by owned entity model types (e.g., ["STOCK", "BOND"]).
+            owner_model_types: Filter by owner entity model types.
+            owned_model_types: Filter by owned entity model types.
             owner_entity_id: Filter by specific owner entity IDs.
             owned_entity_id: Filter by specific owned entity IDs.
+            limit: Maximum number of items to yield. None means no limit.
             page_limit: Results per page (default: 500, max: 2000).
 
-        Returns:
-            List of position resource objects.
-
-        Example:
-            # Get all positions owned by specific entities
-            positions = client.ownership.positions.list_positions(
-                owner_entity_id=["123", "456"],
-                created_after="2024-01-01"
-            )
-
-            # Get minimal position data
-            positions = client.ownership.positions.list_positions(
-                fields=["incepting_open_position_date"],
-                owner_model_types=["TRUST"]
-            )
+        Yields:
+            Individual position resource objects.
         """
         params: Dict[str, Any] = {}
 
@@ -127,7 +115,75 @@ class PositionsResource(BaseResource):
         if owned_entity_id:
             params["filter[owned_entity_id]"] = ",".join(owned_entity_id)
 
-        positions = list(self._paginate("/positions", params=params, page_limit=page_limit))
+        return self._paginate("/positions", params=params, page_limit=page_limit, max_items=limit)
+
+    def list_positions(
+        self,
+        *,
+        fields: Optional[List[str]] = None,
+        created_before: Optional[str] = None,
+        created_after: Optional[str] = None,
+        modified_before: Optional[str] = None,
+        modified_after: Optional[str] = None,
+        owner_model_types: Optional[List[str]] = None,
+        owned_model_types: Optional[List[str]] = None,
+        owner_entity_id: Optional[List[str]] = None,
+        owned_entity_id: Optional[List[str]] = None,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> List[Dict[str, Any]]:
+        """
+        List all positions with optional filtering and pagination.
+
+        Args:
+            fields: Specific attributes to return (e.g., ["name", "incepting_open_position_date"]).
+                Use empty list [] to omit all attributes.
+            created_before: Filter positions created on/before date (YYYY-MM-DD).
+            created_after: Filter positions created on/after date (YYYY-MM-DD).
+            modified_before: Filter positions modified on/before date (YYYY-MM-DD).
+            modified_after: Filter positions modified on/after date (YYYY-MM-DD).
+            owner_model_types: Filter by owner entity model types (e.g., ["PERSON_NODE", "TRUST"]).
+            owned_model_types: Filter by owned entity model types (e.g., ["STOCK", "BOND"]).
+            owner_entity_id: Filter by specific owner entity IDs.
+            owned_entity_id: Filter by specific owned entity IDs.
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_positions() for unbounded iteration.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Returns:
+            List of position resource objects.
+
+        Example:
+            # Get all positions owned by specific entities
+            positions = client.ownership.positions.list_positions(
+                owner_entity_id=["123", "456"],
+                created_after="2024-01-01"
+            )
+
+            # Get minimal position data
+            positions = client.ownership.positions.list_positions(
+                fields=["incepting_open_position_date"],
+                owner_model_types=["TRUST"]
+            )
+        """
+        positions = list(self.iter_positions(
+            fields=fields,
+            created_before=created_before,
+            created_after=created_after,
+            modified_before=modified_before,
+            modified_after=modified_after,
+            owner_model_types=owner_model_types,
+            owned_model_types=owned_model_types,
+            owner_entity_id=owner_entity_id,
+            owned_entity_id=owned_entity_id,
+            limit=limit,
+            page_limit=page_limit,
+        ))
+        if len(positions) == limit:
+            logger.warning(
+                f"list_positions() returned {limit} items (limit reached). "
+                f"Use iter_positions() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(positions)} positions")
         return positions
 

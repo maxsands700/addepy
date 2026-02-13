@@ -1,8 +1,8 @@
 """Attributes resource for the Addepar API."""
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Generator, List, Optional
 
-from ...constants import AttributeOutputType, AttributeUsage, DEFAULT_PAGE_LIMIT
+from ...constants import AttributeOutputType, AttributeUsage, DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -46,12 +46,51 @@ class AttributesResource(BaseResource):
         logger.debug(f"Retrieved attribute: {attribute_id}")
         return result
 
+    def iter_attributes(
+        self,
+        *,
+        category: Optional[str] = None,
+        usage: Optional[AttributeUsage] = None,
+        output_type: Optional[AttributeOutputType] = None,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """
+        Iterate over attributes lazily with optional filters.
+
+        Args:
+            category: Filter by category (e.g., "Cash Flows", "Security Details").
+            usage: Filter by usage.
+            output_type: Filter by output type.
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Yields:
+            Individual attribute resource objects.
+        """
+        params: Dict[str, Any] = {}
+
+        if category is not None:
+            params["filter[category]"] = category
+        if usage is not None:
+            params["filter[usage]"] = usage
+        if output_type is not None:
+            params["filter[output_type]"] = output_type
+
+        return self._paginate(
+            "/attributes",
+            page_limit=page_limit,
+            params=params if params else None,
+            max_items=limit,
+        )
+
     def list_attributes(
         self,
         *,
         category: Optional[str] = None,
         usage: Optional[AttributeUsage] = None,
         output_type: Optional[AttributeOutputType] = None,
+        limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         """
@@ -65,6 +104,8 @@ class AttributesResource(BaseResource):
                 "entity_attributes".
             output_type: Filter by output type. One of: "Word", "Boolean",
                 "Percent", "Date", "Currency", "List", "Number".
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_attributes() for unbounded iteration.
             page_limit: Results per page (default: 500, max: 2000).
 
         Returns:
@@ -81,22 +122,18 @@ class AttributesResource(BaseResource):
                 usage="columns"
             )
         """
-        params: Dict[str, Any] = {}
-
-        if category is not None:
-            params["filter[category]"] = category
-        if usage is not None:
-            params["filter[usage]"] = usage
-        if output_type is not None:
-            params["filter[output_type]"] = output_type
-
-        attributes = list(
-            self._paginate(
-                "/attributes",
-                page_limit=page_limit,
-                params=params if params else None,
+        attributes = list(self.iter_attributes(
+            category=category,
+            usage=usage,
+            output_type=output_type,
+            limit=limit,
+            page_limit=page_limit,
+        ))
+        if len(attributes) == limit:
+            logger.warning(
+                f"list_attributes() returned {limit} items (limit reached). "
+                f"Use iter_attributes() for full results or pass a higher limit."
             )
-        )
         logger.debug(f"Listed {len(attributes)} attributes")
         return attributes
 

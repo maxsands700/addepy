@@ -1,9 +1,9 @@
 """Files resource for the Addepar API."""
 import json
 import logging
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, Generator, List, Optional, Union
 
-from ...constants import DEFAULT_PAGE_LIMIT
+from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -66,32 +66,34 @@ class FilesResource(BaseResource):
         logger.debug(f"Retrieved file {file_id}")
         return file
 
-    def list_files(
+    def iter_files(
         self,
         *,
-        page_limit: int = DEFAULT_PAGE_LIMIT,
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         entity_id: Optional[str] = None,
         group_id: Optional[str] = None,
         included_objects: Optional[str] = None,
         parent_folder_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
         """
-        List all files and/or folders with pagination and optional filters.
+        Iterate over files lazily with optional filters.
 
         Args:
-            page_limit: Results per page (default: 500, max: 2000).
             created_after: Files created after date (ISO 8601).
             created_before: Files created before date (ISO 8601).
             entity_id: Filter by associated entity ID.
             group_id: Filter by associated group ID.
-            included_objects: What to include - "FILES_ONLY" (default),
-                "FOLDERS_ONLY", or "FILES_AND_FOLDERS".
+            included_objects: What to include - "FILES_ONLY", "FOLDERS_ONLY",
+                or "FILES_AND_FOLDERS".
             parent_folder_id: Filter by parent folder ID.
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
 
-        Returns:
-            List of file/folder resource objects.
+        Yields:
+            Individual file/folder resource objects.
         """
         params: Dict[str, Any] = {}
 
@@ -108,9 +110,53 @@ class FilesResource(BaseResource):
         if parent_folder_id is not None:
             params["filter[files][parentFolderId]"] = parent_folder_id
 
-        files = list(
-            self._paginate("/files", page_limit=page_limit, params=params if params else None)
-        )
+        return self._paginate("/files", page_limit=page_limit, params=params if params else None, max_items=limit)
+
+    def list_files(
+        self,
+        *,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        group_id: Optional[str] = None,
+        included_objects: Optional[str] = None,
+        parent_folder_id: Optional[str] = None,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> List[Dict[str, Any]]:
+        """
+        List all files and/or folders with pagination and optional filters.
+
+        Args:
+            created_after: Files created after date (ISO 8601).
+            created_before: Files created before date (ISO 8601).
+            entity_id: Filter by associated entity ID.
+            group_id: Filter by associated group ID.
+            included_objects: What to include - "FILES_ONLY" (default),
+                "FOLDERS_ONLY", or "FILES_AND_FOLDERS".
+            parent_folder_id: Filter by parent folder ID.
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_files() for unbounded iteration.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Returns:
+            List of file/folder resource objects.
+        """
+        files = list(self.iter_files(
+            created_after=created_after,
+            created_before=created_before,
+            entity_id=entity_id,
+            group_id=group_id,
+            included_objects=included_objects,
+            parent_folder_id=parent_folder_id,
+            limit=limit,
+            page_limit=page_limit,
+        ))
+        if len(files) == limit:
+            logger.warning(
+                f"list_files() returned {limit} items (limit reached). "
+                f"Use iter_files() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(files)} files")
         return files
 
@@ -290,28 +336,30 @@ class FilesResource(BaseResource):
         logger.debug(f"Retrieved archived file {file_id}")
         return file
 
-    def list_archived_files(
+    def iter_archived_files(
         self,
         *,
-        page_limit: int = DEFAULT_PAGE_LIMIT,
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
         included_objects: Optional[str] = None,
         parent_folder_id: Optional[str] = None,
-    ) -> List[Dict[str, Any]]:
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
         """
-        List all archived (deleted) files and/or folders.
+        Iterate over archived files lazily with optional filters.
 
         Args:
-            page_limit: Results per page (default: 500, max: 2000).
             created_after: Files created after date (ISO 8601).
             created_before: Files created before date (ISO 8601).
-            included_objects: What to include - "FILES_ONLY" (default),
-                "FOLDERS_ONLY", or "FILES_AND_FOLDERS".
+            included_objects: What to include - "FILES_ONLY", "FOLDERS_ONLY",
+                or "FILES_AND_FOLDERS".
             parent_folder_id: Filter by parent folder ID.
+            limit: Maximum number of items to yield. None means no limit.
+            page_limit: Results per page (default: 500, max: 2000).
 
-        Returns:
-            List of archived file/folder resource objects.
+        Yields:
+            Individual archived file/folder resource objects.
         """
         params: Dict[str, Any] = {}
 
@@ -324,9 +372,47 @@ class FilesResource(BaseResource):
         if parent_folder_id is not None:
             params["filter[files][parentFolderId]"] = parent_folder_id
 
-        files = list(
-            self._paginate("/archive/files", page_limit=page_limit, params=params if params else None)
-        )
+        return self._paginate("/archive/files", page_limit=page_limit, params=params if params else None, max_items=limit)
+
+    def list_archived_files(
+        self,
+        *,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+        included_objects: Optional[str] = None,
+        parent_folder_id: Optional[str] = None,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> List[Dict[str, Any]]:
+        """
+        List all archived (deleted) files and/or folders.
+
+        Args:
+            created_after: Files created after date (ISO 8601).
+            created_before: Files created before date (ISO 8601).
+            included_objects: What to include - "FILES_ONLY" (default),
+                "FOLDERS_ONLY", or "FILES_AND_FOLDERS".
+            parent_folder_id: Filter by parent folder ID.
+            limit: Maximum number of items to return (default: 10,000).
+                Use iter_archived_files() for unbounded iteration.
+            page_limit: Results per page (default: 500, max: 2000).
+
+        Returns:
+            List of archived file/folder resource objects.
+        """
+        files = list(self.iter_archived_files(
+            created_after=created_after,
+            created_before=created_before,
+            included_objects=included_objects,
+            parent_folder_id=parent_folder_id,
+            limit=limit,
+            page_limit=page_limit,
+        ))
+        if len(files) == limit:
+            logger.warning(
+                f"list_archived_files() returned {limit} items (limit reached). "
+                f"Use iter_archived_files() for full results or pass a higher limit."
+            )
         logger.debug(f"Listed {len(files)} archived files")
         return files
 
