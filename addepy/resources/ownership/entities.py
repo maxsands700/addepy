@@ -24,9 +24,10 @@ class EntitiesResource(BaseResource):
         - delete_entity() - Delete a single entity
         - delete_entities() - Bulk delete entities
 
-    Entity Types (Read-only):
+    Entity Types:
         - get_entity_type() - Get a single model type by API name
         - list_entity_types() - List all available model types
+        - change_model_types() - Change model types for existing entities
     """
 
     # =========================================================================
@@ -282,7 +283,7 @@ class EntitiesResource(BaseResource):
             The updated entity resource object.
 
         Note:
-            The model_type attribute generally cannot be updated.
+            Use change_model_type() to change an entity's model type.
         """
         payload = {
             "data": {
@@ -326,7 +327,7 @@ class EntitiesResource(BaseResource):
             List of updated entity resource objects.
 
         Note:
-            The model_type attribute generally cannot be updated.
+            Use change_model_types() to change entities' model types.
         """
         payload = {
             "data": [
@@ -390,7 +391,7 @@ class EntitiesResource(BaseResource):
         logger.info(f"Deleted {len(entity_ids)} entities")
 
     # =========================================================================
-    # Entity Types (Read-Only)
+    # Entity Types
     # =========================================================================
 
     def get_entity_type(self, type_id: str) -> Dict[str, Any]:
@@ -406,7 +407,7 @@ class EntitiesResource(BaseResource):
                 - display_name: Human-readable name
                 - category: Broad category classification
                 - ownership_type: Ownership structure (share_based, percent_based, value_based)
-                - entity_attributes: Dictionary of available attributes for this type
+                - entity_attributes: Array of attribute definitions for this type
         """
         response = self._get(f"/entity_types/{type_id}")
         data = response.json()
@@ -430,3 +431,29 @@ class EntitiesResource(BaseResource):
         entity_types = data.get("data", [])
         logger.debug(f"Listed {len(entity_types)} entity types")
         return entity_types
+
+    def change_model_type(self, entity_id: str, new_model_type: str) -> Dict[str, Any]:
+        """Change an entity's model type through the dedicated entity_types route.
+
+        The API checks compatibility with the entity's ownership type. Existing
+        attributes unsupported by the target model type may be lost.
+        """
+        results = self.change_model_types([
+            {"id": entity_id, "new_model_type": new_model_type}
+        ])
+        if len(results) != 1:
+            raise AddePyError("Expected one entity model type update in the response")
+        return results[0]
+
+    def change_model_types(self, updates: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        """Bulk change model types using dictionaries with id and new_model_type.
+
+        Model type keys use API names, such as ``hedge_fund`` and ``etf``.
+        Existing attributes unsupported by the target type may be lost.
+        """
+        payload = {"data": [
+            {"type": "entity_type_updates", "id": update["id"],
+             "attributes": {"new_model_type": update["new_model_type"]}}
+            for update in updates
+        ]}
+        return self._patch("/entity_types", json=payload).json()["data"]

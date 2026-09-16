@@ -1,9 +1,9 @@
 """Import Tool resource for the Addepar API."""
-import io
+
+from pathlib import Path
 import logging
 from typing import Any, Dict
 
-import pandas as pd
 
 from ...constants import (
     ALL_VALID_IMPORT_TYPES,
@@ -40,18 +40,18 @@ class ImportToolResource(BaseResource):
     # =========================================================================
 
     def create_import(
-            self,
-            import_dataframe: pd.DataFrame,
-            import_type: AddeparImportType,
-            *,
-            is_dry_run: bool = True,
-            ignore_warnings: bool = False,
-        ) -> str:
+        self,
+        import_dataframe: Any,
+        import_type: AddeparImportType,
+        *,
+        is_dry_run: bool = True,
+        ignore_warnings: bool = False,
+    ) -> str:
         """
         Submit an import job to the Addepar Imports API.
 
         Args:
-            import_dataframe: Pandas DataFrame containing data to import.
+            import_dataframe: CSV text/bytes, pathlib.Path, readable file, or pandas DataFrame.
             import_type: Type of data being imported (e.g., 'ATTRIBUTES', 'TRANSACTIONS').
             is_dry_run: If True, performs validation without saving (default: True).
             ignore_warnings: If True, proceed despite warnings (default: False).
@@ -86,10 +86,25 @@ class ImportToolResource(BaseResource):
             "ignore_warnings": str(ignore_warnings).lower(),
         }
 
-        # Convert DataFrame to CSV
-        csv_buffer = io.StringIO()
-        import_dataframe.to_csv(csv_buffer, index=False, encoding="utf-8")
-        csv_payload = csv_buffer.getvalue()
+        # Accept CSV without importing an optional dataframe dependency.
+        if isinstance(import_dataframe, Path):
+            csv_payload = import_dataframe.read_text(encoding="utf-8-sig")
+        elif isinstance(import_dataframe, bytes):
+            csv_payload = import_dataframe.decode("utf-8-sig")
+        elif isinstance(import_dataframe, str):
+            csv_payload = import_dataframe
+        elif callable(getattr(import_dataframe, "read", None)):
+            csv_payload = import_dataframe.read()
+            if isinstance(csv_payload, bytes):
+                csv_payload = csv_payload.decode("utf-8-sig")
+        elif callable(getattr(import_dataframe, "to_csv", None)):
+            csv_payload = import_dataframe.to_csv(index=False)
+        else:
+            raise TypeError(
+                "Import data must be CSV text, bytes, Path, readable file, or DataFrame"
+            )
+        if not isinstance(csv_payload, str) or not csv_payload.strip():
+            raise ValueError("Import CSV cannot be empty")
 
         # Override Content-Type for CSV payload
         headers = {"Content-Type": "text/plain"}
@@ -139,7 +154,9 @@ class ImportToolResource(BaseResource):
         """
         response = self._get(f"/imports/{import_id}")
         data = response.json()
-        status = data.get("data", {}).get("attributes", {}).get("status", "UNKNOWN_STATUS")
+        status = (
+            data.get("data", {}).get("attributes", {}).get("status", "UNKNOWN_STATUS")
+        )
         logger.debug(f"Import {import_id} status: {status}")
         return status
 
@@ -172,17 +189,17 @@ class ImportToolResource(BaseResource):
     # =========================================================================
 
     def execute_import(
-            self,
-            import_dataframe: pd.DataFrame,
-            import_type: AddeparImportType,
-            *,
-            is_dry_run: bool = True,
-            ignore_warnings: bool = False,
-            initial_wait: float = DEFAULT_INITIAL_WAIT,
-            max_wait: float = DEFAULT_MAX_WAIT,
-            backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
-            timeout: float = DEFAULT_TIMEOUT,
-        ) -> Dict[str, Any]:
+        self,
+        import_dataframe: Any,
+        import_type: AddeparImportType,
+        *,
+        is_dry_run: bool = True,
+        ignore_warnings: bool = False,
+        initial_wait: float = DEFAULT_INITIAL_WAIT,
+        max_wait: float = DEFAULT_MAX_WAIT,
+        backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
+        timeout: float = DEFAULT_TIMEOUT,
+    ) -> Dict[str, Any]:
         """
         Submit an import, poll for completion, and fetch results.
 
@@ -190,7 +207,7 @@ class ImportToolResource(BaseResource):
         get_import_status(), and get_import_results() into a single call.
 
         Args:
-            import_dataframe: Pandas DataFrame containing data to import.
+            import_dataframe: CSV text/bytes, pathlib.Path, readable file, or pandas DataFrame.
             import_type: Type of data being imported.
             is_dry_run: If True, performs validation without saving (default: True).
             ignore_warnings: If True, proceed despite warnings (default: False).

@@ -2,6 +2,33 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-09-16
+
+### Added
+- Explicit configuration factories: `AddePy.from_env()` for process variables and `AddePy.from_dotenv()` for a consuming Git repository's root `.env` or an explicit file path.
+- Raw dictionary/JSON-string queries for portfolio and transaction jobs, shared wait/resume/download helpers, and optional beta batched portfolio jobs.
+- Raw synchronous portfolio/transaction queries.
+- OAuth bearer/refresh support, explicit environment URLs, injected sessions, public raw requests, full-page iteration, and atomic streaming downloads.
+- Fees, fee schedules, payouts, report schedules, expanded billable portfolios, estimated returns, derivative underlying assets, benchmark proxy reads/deletes, and model-type changes.
+- Offline unit/contract suite with network blocking and CI; an explicit guarded live diagnostic command with JSON/Markdown reports.
+
+### Changed
+- `AddePy(...)` now uses only explicit settings; `load_env` is removed. Factories do not merge file/process settings, interpolate values, or modify the environment. See the configuration migration examples.
+- pandas is optional; imports accept CSV text/bytes, Path, file objects, and DataFrames.
+- Read requests retry transient failures within configured limits; writes require explicit retry opt-in.
+- Polling uses immediate status checks and monotonic deadlines; pagination follows returned endpoint-specific coordinates.
+- HTTP exceptions retain status, structured errors and request IDs without copying bodies into their messages.
+
+### Fixed
+- Portfolio polling recognizes completed result documents without a status, matching user-confirmed live behavior despite the online documentation. Other missing-status responses still fail; explicit failure states terminate polling.
+- Diagnostics no longer label jobs `Pending` before receiving a status; completed portfolio results are reported as `Completed` even when the API omits status and progress.
+- Bulk transaction/benchmark methods preserve caller inputs.
+- Historical-price submissions reject missing async job IDs.
+- File uploads use the shared authenticated transport.
+- README method aliases and package version metadata are consistent.
+
+See [migration](MIGRATION.md), [resources](docs/resources.md), and [development](docs/development.md) for upgrade instructions, API usage, and testing.
+
 ## [0.2.0] - 2025-12-12
 
 ### Added

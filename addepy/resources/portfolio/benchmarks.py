@@ -1,6 +1,7 @@
 """Benchmarks resource for the Addepar API."""
 import logging
-from typing import Any, Dict, Generator, List, Optional
+from copy import deepcopy
+from typing import Any, Dict, Generator, List, Optional, Sequence, Union
 
 from ...constants import BenchmarkType, DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT, MatchingType
 from ..base import BaseResource
@@ -277,11 +278,11 @@ class BenchmarksResource(BaseResource):
         """
         payload_data = []
         for benchmark in benchmarks:
-            benchmark_id = benchmark.pop("id")
+            benchmark_id = benchmark["id"]
             payload_data.append({
                 "id": benchmark_id,
                 "type": "benchmarks",
-                "attributes": benchmark,
+                "attributes": deepcopy({key: value for key, value in benchmark.items() if key != "id"}),
             })
 
         payload = {"data": payload_data}
@@ -302,6 +303,47 @@ class BenchmarksResource(BaseResource):
         """
         self._delete(f"/benchmarks/{benchmark_id}")
         logger.info(f"Deleted benchmark: {benchmark_id}")
+
+    def get_benchmark_proxy(self, proxy_id: str) -> Dict[str, Any]:
+        """Get a proxy by composite ID, for example ``116_2025-12-31``."""
+        return self._get(f"/benchmark_proxies/{proxy_id}").json()["data"]
+
+    def iter_benchmark_proxies(
+        self,
+        *,
+        entity_ids: Optional[Sequence[Union[str, int]]] = None,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """Iterate benchmark proxy assignments, optionally filtered by entity."""
+        params: Dict[str, Any] = {}
+        if entity_ids is not None:
+            if isinstance(entity_ids, (str, bytes)) or not entity_ids:
+                raise ValueError("entity_ids must be a nonempty sequence of entity IDs")
+            params["filter[entity_id]"] = ",".join(str(value) for value in entity_ids)
+        return self._paginate(
+            "/benchmark_proxies", params=params, page_limit=page_limit, max_items=limit
+        )
+
+    def list_benchmark_proxies(
+        self,
+        *,
+        entity_ids: Optional[Sequence[Union[str, int]]] = None,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+    ) -> List[Dict[str, Any]]:
+        """List proxy assignments, preserving server-provided attributes."""
+        return list(self.iter_benchmark_proxies(
+            entity_ids=entity_ids, limit=limit, page_limit=page_limit,
+        ))
+
+    def delete_benchmark_proxy(self, proxy_id: str) -> None:
+        """Delete one benchmark proxy by composite ID."""
+        self._delete(f"/benchmark_proxies/{proxy_id}")
+
+    def delete_entity_benchmark_proxies(self, entity_id: Union[str, int]) -> None:
+        """Delete ALL benchmark proxies for an entity."""
+        self._delete(f"/benchmark_proxies/entity/{entity_id}")
 
     # =========================================================================
     # Benchmark Compositions Methods

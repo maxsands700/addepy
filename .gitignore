@@ -1,13 +1,21 @@
 venv/
+.venv/
 .env
+.env.*
+!.env.example
 __pycache__/
 *.ipynb
 .DS_Store
 CLAUDE.md
-docs/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+test-results/
+live-queries/
 
 # Build artifacts
 dist/
 build/
 *.egg-info/
-

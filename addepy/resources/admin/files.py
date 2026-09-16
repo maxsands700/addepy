@@ -1,6 +1,7 @@
 """Files resource for the Addepar API."""
 import json
 import logging
+from pathlib import Path
 from typing import Any, Dict, Generator, List, Optional, Union
 
 from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
@@ -174,6 +175,10 @@ class FilesResource(BaseResource):
         logger.debug(f"Downloaded file {file_id}")
         return response.content
 
+    def download_file_to(self, file_id: str, path: Union[str, Path], *, overwrite: bool = False) -> Path:
+        """Stream a vault file to disk without loading its contents into memory."""
+        return self._client.download(f"/files/{file_id}/download", path, overwrite=overwrite)
+
     def upload_file(
         self,
         file_data: Union[bytes, str],
@@ -255,10 +260,7 @@ class FilesResource(BaseResource):
         }
 
         # Make request without JSON content-type (requests handles multipart)
-        url = f"{self._client._base_url}/files"
-        headers = {k: v for k, v in self._client._headers.items() if k.lower() != "content-type"}
-        response = self._client._session.post(url, files=files_payload, headers=headers)
-        response.raise_for_status()
+        response = self._post("/files", files=files_payload, headers={"Content-Type": None})
 
         data = response.json()
         file = data.get("data", {})
@@ -429,6 +431,10 @@ class FilesResource(BaseResource):
         response = self._get(f"/archive/files/{file_id}/download")
         logger.debug(f"Downloaded archived file {file_id}")
         return response.content
+
+    def download_archived_file_to(self, file_id: str, path: Union[str, Path], *, overwrite: bool = False) -> Path:
+        """Stream an archived file to an atomic destination file."""
+        return self._client.download(f"/archive/files/{file_id}/download", path, overwrite=overwrite)
 
     # =========================================================================
     # Associated Groups Methods

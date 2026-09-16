@@ -1,11 +1,13 @@
 """Transactions resource for the Addepar API."""
 import logging
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, Union
 
 import requests
 
 from ...constants import PortfolioType, TransactionOutputType, TransactionType
 from ..base import BaseResource
+from ..query import QueryInput, query_parameters
 
 logger = logging.getLogger("addepy")
 
@@ -252,9 +254,13 @@ class TransactionsResource(BaseResource):
         """
         payload_data = []
         for tx in transactions:
-            owner_id = tx.pop("owner_id")
-            owned_id = tx.pop("owned_id")
-            cash_position_id = tx.pop("cash_position_id", None)
+            owner_id = tx["owner_id"]
+            owned_id = tx["owned_id"]
+            cash_position_id = tx.get("cash_position_id")
+            attributes = deepcopy({
+                key: value for key, value in tx.items()
+                if key not in {"owner_id", "owned_id", "cash_position_id"}
+            })
 
             relationships: Dict[str, Any] = {
                 "owner": {"data": {"type": "entities", "id": owner_id}},
@@ -267,7 +273,7 @@ class TransactionsResource(BaseResource):
 
             payload_data.append({
                 "type": "transactions",
-                "attributes": tx,
+                "attributes": attributes,
                 "relationships": relationships,
             })
 
@@ -490,6 +496,16 @@ class TransactionsResource(BaseResource):
         logger.debug(f"Retrieved view {view_id} results")
         return response
 
+    def query_raw(self, query: QueryInput) -> Dict[str, Any]:
+        """Execute copied transaction query parameters or JSON text synchronously.
+
+        Also accepts a JSON:API data.attributes envelope. Every query field and
+        nested value is preserved without mutating input. Returns the complete
+        response, including meta.columns; use transaction_jobs for large exports.
+        """
+        payload = {"data": {"type": "transaction_query", "attributes": query_parameters(query)}}
+        return self._post("/transactions/query", json=payload).json()
+
     def query_transactions(
         self,
         columns: List[str],
@@ -577,14 +593,6 @@ class TransactionsResource(BaseResource):
         if limit is not None:
             query_attributes["limit"] = limit
 
-        payload = {
-            "data": {
-                "type": "transaction_query",
-                "attributes": query_attributes,
-            }
-        }
-
-        response = self._post("/transactions/query", json=payload)
-        data = response.json()
+        data = self.query_raw(query_attributes)
         logger.debug(f"Query returned {len(data.get('data', []))} transactions")
         return data
