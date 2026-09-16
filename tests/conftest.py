@@ -14,7 +14,9 @@ def offline_only(monkeypatch):
             monkeypatch.delenv(name)
 
     def blocked(*args, **kwargs):
-        raise AssertionError("Network disabled in offline tests; use python -m addepy.diagnostics for live checks")
+        raise AssertionError(
+            "Network disabled in offline tests; use python -m addepy.diagnostics for live checks"
+        )
 
     monkeypatch.setattr(socket.socket, "connect", blocked)
     monkeypatch.setattr(socket.socket, "connect_ex", blocked)

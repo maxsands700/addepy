@@ -1,4 +1,5 @@
 """Custom exceptions for the Addepy SDK."""
+
 from typing import Any, Optional
 
 import requests
@@ -17,7 +18,9 @@ class AddePyError(Exception):
         self.request_id = None
         self.errors: Any = None
         if response is not None:
-            self.request_id = response.headers.get("X-Request-ID") or response.headers.get("Request-ID")
+            self.request_id = response.headers.get(
+                "X-Request-ID"
+            ) or response.headers.get("Request-ID")
             try:
                 body = response.json()
                 if isinstance(body, dict):
@@ -57,7 +60,7 @@ class RateLimitError(AddePyError):
         self,
         message: str,
         response: Optional[requests.Response] = None,
-        retry_after: Optional[int] = None,
+        retry_after: Optional[float] = None,
     ) -> None:
         super().__init__(message, response)
         self.retry_after = retry_after
@@ -101,9 +104,15 @@ class ProtocolError(AddePyError):
 class JobError(AddePyError):
     """A server-side job failed; retains its identifier and structured details."""
 
-    def __init__(self, message: str, job_id: str, status: Optional[str] = None,
-                 errors: Any = None, job_data: Any = None,
-                 response: Optional[requests.Response] = None) -> None:
+    def __init__(
+        self,
+        message: str,
+        job_id: str,
+        status: Optional[str] = None,
+        errors: Any = None,
+        job_data: Any = None,
+        response: Optional[requests.Response] = None,
+    ) -> None:
         super().__init__(message, response)
         self.job_id = job_id
         self.status = status

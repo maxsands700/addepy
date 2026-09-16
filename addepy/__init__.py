@@ -19,6 +19,7 @@ Logging:
     logging.getLogger("addepy").setLevel(logging.DEBUG)
     logging.getLogger("addepy").addHandler(logging.StreamHandler())
 """
+
 import logging
 
 from .client import AddePy

@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 
 from ._version import __version__
 from .constants import DEFAULT_CONTENT_TYPE, DEFAULT_REQUEST_TIMEOUT
+from .exceptions import RequestTimeoutError, TransportError
 from .transport import Transport, raise_api_error
 
 if TYPE_CHECKING:
@@ -30,46 +31,83 @@ class AddePy:
     ``load_env=False`` skips .env loading; it still permits environment variables.
     """
 
-    def __init__(self, firm_name: Optional[str] = None, firm_id: Optional[str] = None,
-                 api_key: Optional[str] = None, load_env: bool = True, *,
-                 key_id: Optional[str] = None, key_secret: Optional[str] = None,
-                 access_token: Optional[str] = None,
-                 token_provider: Optional[Callable[[], str]] = None,
-                 environment: Optional[str] = None, base_url: Optional[str] = None,
-                 timeout: Any = DEFAULT_REQUEST_TIMEOUT, max_retries: int = 2,
-                 max_retry_wait: float = 60,
-                 session: Optional[requests.Session] = None,
-                 download_session: Optional[requests.Session] = None) -> None:
+    def __init__(
+        self,
+        firm_name: Optional[str] = None,
+        firm_id: Optional[str] = None,
+        api_key: Optional[str] = None,
+        load_env: bool = True,
+        *,
+        key_id: Optional[str] = None,
+        key_secret: Optional[str] = None,
+        access_token: Optional[str] = None,
+        token_provider: Optional[Callable[[], str]] = None,
+        environment: Optional[str] = None,
+        base_url: Optional[str] = None,
+        timeout: Any = DEFAULT_REQUEST_TIMEOUT,
+        max_retries: int = 2,
+        max_retry_wait: float = 60,
+        session: Optional[requests.Session] = None,
+        download_session: Optional[requests.Session] = None,
+    ) -> None:
         if load_env:
             load_dotenv()
         self._firm_name = firm_name or os.getenv("ADDEPAR_FIRM_NAME")
         self._firm_id = str(firm_id or os.getenv("ADDEPAR_FIRM_ID") or "")
         self.environment = environment or os.getenv("ADDEPAR_ENVIRONMENT", "production")
-        suffixes = {"production": "addepar.com", "development": "clientdev.addepar.com",
-                    "sandbox": "sandbox.addepar.com"}
+        suffixes = {
+            "production": "addepar.com",
+            "development": "clientdev.addepar.com",
+            "sandbox": "sandbox.addepar.com",
+        }
         if self.environment not in suffixes:
             raise ValueError("environment must be production, development, or sandbox")
         self._base_url = base_url or os.getenv("ADDEPAR_BASE_URL")
         if not self._base_url:
-            if not self._firm_name or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", self._firm_name):
+            if not self._firm_name or not re.fullmatch(
+                r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", self._firm_name
+            ):
                 raise ValueError("Provide a valid firm_name or explicit base_url")
-            self._base_url = f"https://{self._firm_name}.{suffixes[self.environment]}/api/v1"
+            self._base_url = (
+                f"https://{self._firm_name}.{suffixes[self.environment]}/api/v1"
+            )
         if not self._firm_id:
             raise ValueError("Missing firm_id/ADDEPAR_FIRM_ID")
 
-        explicit_auth = any(v is not None for v in (api_key, key_id, key_secret, access_token, token_provider))
+        explicit_auth = any(
+            v is not None
+            for v in (api_key, key_id, key_secret, access_token, token_provider)
+        )
         if not explicit_auth:
             access_token = os.getenv("ADDEPAR_ACCESS_TOKEN")
             if not access_token:
                 api_key = os.getenv("ADDEPAR_API_KEY")
         if (key_id is None) != (key_secret is None):
             raise ValueError("key_id and key_secret must be supplied together")
-        if sum((api_key is not None, key_id is not None, access_token is not None, token_provider is not None)) != 1:
-            raise ValueError("Supply exactly one authentication method: api_key, key pair, access_token, or token_provider")
-        headers = {"Accept": DEFAULT_CONTENT_TYPE, "Content-Type": DEFAULT_CONTENT_TYPE,
-                   "Addepar-Firm": self._firm_id, "User-Agent": f"addepy/{__version__}"}
+        if (
+            sum(
+                (
+                    api_key is not None,
+                    key_id is not None,
+                    access_token is not None,
+                    token_provider is not None,
+                )
+            )
+            != 1
+        ):
+            raise ValueError(
+                "Supply exactly one authentication method: api_key, key pair, access_token, or token_provider"
+            )
+        headers = {
+            "Accept": DEFAULT_CONTENT_TYPE,
+            "Content-Type": DEFAULT_CONTENT_TYPE,
+            "Addepar-Firm": self._firm_id,
+            "User-Agent": f"addepy/{__version__}",
+        }
         if key_id is not None:
-            api_key = base64.b64encode(f"{key_id}:{key_secret}".encode()).decode("ascii")
+            api_key = base64.b64encode(f"{key_id}:{key_secret}".encode()).decode(
+                "ascii"
+            )
         if api_key is not None:
             api_key = api_key.removeprefix("Basic ").strip()
             if not api_key:
@@ -80,10 +118,16 @@ class AddePy:
             if not access_token:
                 raise ValueError("access_token cannot be empty")
             headers["Authorization"] = f"Bearer {access_token}"
-        self._transport = Transport(base_url=self._base_url, headers=headers, timeout=timeout,
-                                    max_retries=max_retries, max_retry_wait=max_retry_wait,
-                                    session=session, token_provider=token_provider,
-                                    download_session=download_session)
+        self._transport = Transport(
+            base_url=self._base_url,
+            headers=headers,
+            timeout=timeout,
+            max_retries=max_retries,
+            max_retry_wait=max_retry_wait,
+            session=session,
+            token_provider=token_provider,
+            download_session=download_session,
+        )
         self._session = self._transport.session
         self._portfolio: Optional["PortfolioNamespace"] = None
         self._admin: Optional["AdminNamespace"] = None
@@ -97,6 +141,7 @@ class AddePy:
     def portfolio(self) -> "PortfolioNamespace":
         if self._portfolio is None:
             from .resources.portfolio import PortfolioNamespace
+
             self._portfolio = PortfolioNamespace(self)
         return self._portfolio
 
@@ -104,6 +149,7 @@ class AddePy:
     def admin(self) -> "AdminNamespace":
         if self._admin is None:
             from .resources.admin import AdminNamespace
+
             self._admin = AdminNamespace(self)
         return self._admin
 
@@ -111,6 +157,7 @@ class AddePy:
     def ownership(self) -> "OwnershipNamespace":
         if self._ownership is None:
             from .resources.ownership import OwnershipNamespace
+
             self._ownership = OwnershipNamespace(self)
         return self._ownership
 
@@ -132,10 +179,18 @@ class AddePy:
     def iter_pages(self, endpoint: str, **kwargs: Any) -> Any:
         """Iterate complete JSON:API pages, including included, links and meta."""
         from .resources.base import BaseResource
+
         return BaseResource(self).iter_pages(endpoint, **kwargs)
 
-    def download(self, endpoint: str, path: Any, *, chunk_size: int = 65536,
-                 overwrite: bool = False, **request_kwargs: Any) -> Path:
+    def download(
+        self,
+        endpoint: str,
+        path: Any,
+        *,
+        chunk_size: int = 65536,
+        overwrite: bool = False,
+        **request_kwargs: Any,
+    ) -> Path:
         """Stream to an atomic file; failures never leave partial results.
 
         Caller chooses the filename. Existing files are preserved unless
@@ -150,7 +205,9 @@ class AddePy:
         response = self.request("GET", endpoint, **request_kwargs)
         temporary = None
         try:
-            with tempfile.NamedTemporaryFile(dir=target.parent, prefix=f".{target.name}.", delete=False) as handle:
+            with tempfile.NamedTemporaryFile(
+                dir=target.parent, prefix=f".{target.name}.", delete=False
+            ) as handle:
                 temporary = Path(handle.name)
                 for chunk in response.iter_content(chunk_size=chunk_size):
                     if chunk:
@@ -161,6 +218,13 @@ class AddePy:
                 # Linking protects against concurrent destination creation too.
                 os.link(temporary, target)
             return target
+        except requests.RequestException as exc:
+            error = (
+                RequestTimeoutError
+                if isinstance(exc, requests.Timeout)
+                else TransportError
+            )
+            raise error("Download interrupted before completion") from exc
         finally:
             response.close()
             if temporary is not None:

@@ -1,4 +1,5 @@
 """Import Tool resource for the Addepar API."""
+
 from pathlib import Path
 import logging
 from typing import Any, Dict
@@ -39,13 +40,13 @@ class ImportToolResource(BaseResource):
     # =========================================================================
 
     def create_import(
-            self,
-            import_dataframe: Any,
-            import_type: AddeparImportType,
-            *,
-            is_dry_run: bool = True,
-            ignore_warnings: bool = False,
-        ) -> str:
+        self,
+        import_dataframe: Any,
+        import_type: AddeparImportType,
+        *,
+        is_dry_run: bool = True,
+        ignore_warnings: bool = False,
+    ) -> str:
         """
         Submit an import job to the Addepar Imports API.
 
@@ -92,14 +93,16 @@ class ImportToolResource(BaseResource):
             csv_payload = import_dataframe.decode("utf-8-sig")
         elif isinstance(import_dataframe, str):
             csv_payload = import_dataframe
-        elif hasattr(import_dataframe, "read"):
+        elif callable(getattr(import_dataframe, "read", None)):
             csv_payload = import_dataframe.read()
             if isinstance(csv_payload, bytes):
                 csv_payload = csv_payload.decode("utf-8-sig")
         elif callable(getattr(import_dataframe, "to_csv", None)):
             csv_payload = import_dataframe.to_csv(index=False)
         else:
-            raise TypeError("Import data must be CSV text, bytes, Path, readable file, or DataFrame")
+            raise TypeError(
+                "Import data must be CSV text, bytes, Path, readable file, or DataFrame"
+            )
         if not isinstance(csv_payload, str) or not csv_payload.strip():
             raise ValueError("Import CSV cannot be empty")
 
@@ -151,7 +154,9 @@ class ImportToolResource(BaseResource):
         """
         response = self._get(f"/imports/{import_id}")
         data = response.json()
-        status = data.get("data", {}).get("attributes", {}).get("status", "UNKNOWN_STATUS")
+        status = (
+            data.get("data", {}).get("attributes", {}).get("status", "UNKNOWN_STATUS")
+        )
         logger.debug(f"Import {import_id} status: {status}")
         return status
 
@@ -184,17 +189,17 @@ class ImportToolResource(BaseResource):
     # =========================================================================
 
     def execute_import(
-            self,
-            import_dataframe: Any,
-            import_type: AddeparImportType,
-            *,
-            is_dry_run: bool = True,
-            ignore_warnings: bool = False,
-            initial_wait: float = DEFAULT_INITIAL_WAIT,
-            max_wait: float = DEFAULT_MAX_WAIT,
-            backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
-            timeout: float = DEFAULT_TIMEOUT,
-        ) -> Dict[str, Any]:
+        self,
+        import_dataframe: Any,
+        import_type: AddeparImportType,
+        *,
+        is_dry_run: bool = True,
+        ignore_warnings: bool = False,
+        initial_wait: float = DEFAULT_INITIAL_WAIT,
+        max_wait: float = DEFAULT_MAX_WAIT,
+        backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
+        timeout: float = DEFAULT_TIMEOUT,
+    ) -> Dict[str, Any]:
         """
         Submit an import, poll for completion, and fetch results.
 
