@@ -35,6 +35,10 @@ attributes unsupported by the target type and are excluded from safe live tests.
 
 Existing `update_benchmarks()` no longer removes IDs from caller dictionaries.
 The documented benchmark creation request remains an array with a single object.
+Bulk [transaction creation](https://developers.addepar.com/docs/transactions)
+also preserves caller relationship IDs. [Historical-price submissions](https://developers.addepar.com/docs/historical-prices)
+raise `ProtocolError` if the required asynchronous job ID is missing, instead of
+returning `None` as if submission succeeded.
 
 Live validation should use read-only calls for these resources. Write contracts
 are exercised offline only, including null metric deletion and entity-wide delete

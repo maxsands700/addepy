@@ -2,6 +2,7 @@
 import logging
 from typing import Any, Dict, List, Optional
 
+from ...exceptions import ProtocolError
 from ..base import BaseResource
 
 logger = logging.getLogger("addepy")
@@ -106,6 +107,8 @@ class HistoricalPricesResource(BaseResource):
 
         response = self._post(f"/entities/{entity_id}/prices", json=payload)
         data = response.json()
+        if not isinstance(data, dict) or data.get("async_price_save_id") is None:
+            raise ProtocolError("Historical price response is missing async_price_save_id", response)
         job_id = data.get("async_price_save_id")
         logger.info(
             f"Submitted price creation job {job_id} for entity {entity_id} "
@@ -135,6 +138,8 @@ class HistoricalPricesResource(BaseResource):
         """
         response = self._delete(f"/entities/{entity_id}/prices/{date}")
         data = response.json()
+        if not isinstance(data, dict) or data.get("async_price_delete_id") is None:
+            raise ProtocolError("Historical price response is missing async_price_delete_id", response)
         job_id = data.get("async_price_delete_id")
         logger.info(
             f"Submitted price deletion job {job_id} for entity {entity_id} on {date}"

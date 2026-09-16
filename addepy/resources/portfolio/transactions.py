@@ -1,5 +1,6 @@
 """Transactions resource for the Addepar API."""
 import logging
+from copy import deepcopy
 from typing import Any, Dict, List, Optional, Union
 
 import requests
@@ -252,9 +253,13 @@ class TransactionsResource(BaseResource):
         """
         payload_data = []
         for tx in transactions:
-            owner_id = tx.pop("owner_id")
-            owned_id = tx.pop("owned_id")
-            cash_position_id = tx.pop("cash_position_id", None)
+            owner_id = tx["owner_id"]
+            owned_id = tx["owned_id"]
+            cash_position_id = tx.get("cash_position_id")
+            attributes = deepcopy({
+                key: value for key, value in tx.items()
+                if key not in {"owner_id", "owned_id", "cash_position_id"}
+            })
 
             relationships: Dict[str, Any] = {
                 "owner": {"data": {"type": "entities", "id": owner_id}},
@@ -267,7 +272,7 @@ class TransactionsResource(BaseResource):
 
             payload_data.append({
                 "type": "transactions",
-                "attributes": tx,
+                "attributes": attributes,
                 "relationships": relationships,
             })
 
