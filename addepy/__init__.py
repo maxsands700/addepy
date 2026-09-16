@@ -22,6 +22,8 @@ Logging:
 import logging
 
 from .client import AddePy
+from .auth import OAuthTokenProvider
+from ._version import __version__
 from .exceptions import (
     AddePyError,
     AddePyTimeoutError,
@@ -32,16 +34,24 @@ from .exceptions import (
     NotFoundError,
     RateLimitError,
     ValidationError,
+    JobError,
+    ProtocolError,
+    TransportError,
+    RequestTimeoutError,
 )
 
 # Create logger for the package
 logger = logging.getLogger("addepy")
 logger.addHandler(logging.NullHandler())  # Prevent "no handler" warnings
 
-__version__ = "0.3.0"
-
 __all__ = [
     "AddePy",
+    "OAuthTokenProvider",
+    "__version__",
+    "JobError",
+    "ProtocolError",
+    "TransportError",
+    "RequestTimeoutError",
     "AddePyError",
     "AddePyTimeoutError",
     "AuthenticationError",

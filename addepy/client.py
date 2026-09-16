@@ -1,21 +1,18 @@
-"""Main Addepar API client."""
+"""Public SDK client; resource namespaces share one configurable transport."""
+
+import base64
 import os
-from typing import TYPE_CHECKING, Any, Dict, Optional
+from pathlib import Path
+import re
+import tempfile
+from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import requests
 from dotenv import load_dotenv
 
+from ._version import __version__
 from .constants import DEFAULT_CONTENT_TYPE, DEFAULT_REQUEST_TIMEOUT
-from .exceptions import (
-    AddePyError,
-    AuthenticationError,
-    ConflictError,
-    ForbiddenError,
-    GoneError,
-    NotFoundError,
-    RateLimitError,
-    ValidationError,
-)
+from .transport import Transport, raise_api_error
 
 if TYPE_CHECKING:
     from .resources.admin import AdminNamespace
@@ -24,198 +21,163 @@ if TYPE_CHECKING:
 
 
 class AddePy:
-    """
-    Main client for interacting with the Addepar API.
+    """Addepar client with Basic or OAuth authentication.
 
-    Usage:
-        client = AddePy()  # Uses env vars
-        client = AddePy(firm_name="acme", firm_id="123", api_key="xxx")
-
-        # Access resources
-        client.portfolio.jobs.create_job(...)
-        client.admin.import_tool.create_import(...)
-
-        # Context manager support
-        with AddePy() as client:
-            client.portfolio.jobs.create_job(...)
+    ``api_key`` remains the base64-encoded key:secret pair used by earlier
+    releases. Alternatively pass ``key_id``/``key_secret``, ``access_token``, or
+    a callable ``token_provider``. Explicit credentials override environment
+    credentials. Injected sessions belong to the caller and are not closed.
+    ``load_env=False`` skips .env loading; it still permits environment variables.
     """
 
-    def __init__(
-            self,
-            firm_name: Optional[str] = None,
-            firm_id: Optional[str] = None,
-            api_key: Optional[str] = None,
-            load_env: bool = True,
-        ) -> None:
-        """
-        Initialize the Addepar client.
-
-        Args:
-            firm_name: Addepar firm name (or set ADDEPAR_FIRM_NAME env var)
-            firm_id: Addepar firm ID (or set ADDEPAR_FIRM_ID env var)
-            api_key: Base64-encoded API key (or set ADDEPAR_API_KEY env var)
-            load_env: Whether to load environment variables from .env file
-        """
+    def __init__(self, firm_name: Optional[str] = None, firm_id: Optional[str] = None,
+                 api_key: Optional[str] = None, load_env: bool = True, *,
+                 key_id: Optional[str] = None, key_secret: Optional[str] = None,
+                 access_token: Optional[str] = None,
+                 token_provider: Optional[Callable[[], str]] = None,
+                 environment: Optional[str] = None, base_url: Optional[str] = None,
+                 timeout: Any = DEFAULT_REQUEST_TIMEOUT, max_retries: int = 2,
+                 max_retry_wait: float = 60,
+                 session: Optional[requests.Session] = None,
+                 download_session: Optional[requests.Session] = None) -> None:
         if load_env:
             load_dotenv()
-
         self._firm_name = firm_name or os.getenv("ADDEPAR_FIRM_NAME")
-        self._firm_id = firm_id or os.getenv("ADDEPAR_FIRM_ID")
-        self._api_key = api_key or os.getenv("ADDEPAR_API_KEY")
+        self._firm_id = str(firm_id or os.getenv("ADDEPAR_FIRM_ID") or "")
+        self.environment = environment or os.getenv("ADDEPAR_ENVIRONMENT", "production")
+        suffixes = {"production": "addepar.com", "development": "clientdev.addepar.com",
+                    "sandbox": "sandbox.addepar.com"}
+        if self.environment not in suffixes:
+            raise ValueError("environment must be production, development, or sandbox")
+        self._base_url = base_url or os.getenv("ADDEPAR_BASE_URL")
+        if not self._base_url:
+            if not self._firm_name or not re.fullmatch(r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", self._firm_name):
+                raise ValueError("Provide a valid firm_name or explicit base_url")
+            self._base_url = f"https://{self._firm_name}.{suffixes[self.environment]}/api/v1"
+        if not self._firm_id:
+            raise ValueError("Missing firm_id/ADDEPAR_FIRM_ID")
 
-        # Normalize API key - strip "Basic " prefix if present
-        if self._api_key and self._api_key.startswith("Basic "):
-            self._api_key = self._api_key[6:]  # len("Basic ") == 6
-
-        # Validate required configuration
-        if not all([self._firm_name, self._firm_id, self._api_key]):
-            missing = []
-            if not self._firm_name:
-                missing.append("firm_name/ADDEPAR_FIRM_NAME")
-            if not self._firm_id:
-                missing.append("firm_id/ADDEPAR_FIRM_ID")
-            if not self._api_key:
-                missing.append("api_key/ADDEPAR_API_KEY")
-            raise ValueError(f"Missing required configuration: {', '.join(missing)}")
-
-        self._base_url = f"https://{self._firm_name}.addepar.com/api/v1"
-
-        # Create session for connection pooling
-        self._session = requests.Session()
-        self._session.headers.update(
-            {
-                "Content-Type": DEFAULT_CONTENT_TYPE,
-                "Addepar-Firm": self._firm_id,
-                "Authorization": f"Basic {self._api_key}",
-            }
-        )
-
-        # Lazy-loaded namespaces
+        explicit_auth = any(v is not None for v in (api_key, key_id, key_secret, access_token, token_provider))
+        if not explicit_auth:
+            access_token = os.getenv("ADDEPAR_ACCESS_TOKEN")
+            if not access_token:
+                api_key = os.getenv("ADDEPAR_API_KEY")
+        if (key_id is None) != (key_secret is None):
+            raise ValueError("key_id and key_secret must be supplied together")
+        if sum((api_key is not None, key_id is not None, access_token is not None, token_provider is not None)) != 1:
+            raise ValueError("Supply exactly one authentication method: api_key, key pair, access_token, or token_provider")
+        headers = {"Accept": DEFAULT_CONTENT_TYPE, "Content-Type": DEFAULT_CONTENT_TYPE,
+                   "Addepar-Firm": self._firm_id, "User-Agent": f"addepy/{__version__}"}
+        if key_id is not None:
+            api_key = base64.b64encode(f"{key_id}:{key_secret}".encode()).decode("ascii")
+        if api_key is not None:
+            api_key = api_key.removeprefix("Basic ").strip()
+            if not api_key:
+                raise ValueError("api_key cannot be empty")
+            headers["Authorization"] = f"Basic {api_key}"
+        if access_token is not None:
+            access_token = access_token.removeprefix("Bearer ").strip()
+            if not access_token:
+                raise ValueError("access_token cannot be empty")
+            headers["Authorization"] = f"Bearer {access_token}"
+        self._transport = Transport(base_url=self._base_url, headers=headers, timeout=timeout,
+                                    max_retries=max_retries, max_retry_wait=max_retry_wait,
+                                    session=session, token_provider=token_provider,
+                                    download_session=download_session)
+        self._session = self._transport.session
         self._portfolio: Optional["PortfolioNamespace"] = None
         self._admin: Optional["AdminNamespace"] = None
         self._ownership: Optional["OwnershipNamespace"] = None
 
     @property
+    def base_url(self) -> str:
+        return self._transport.base_url
+
+    @property
     def portfolio(self) -> "PortfolioNamespace":
-        """Access portfolio resources (jobs, etc.)."""
         if self._portfolio is None:
             from .resources.portfolio import PortfolioNamespace
-
             self._portfolio = PortfolioNamespace(self)
         return self._portfolio
 
     @property
     def admin(self) -> "AdminNamespace":
-        """Access admin resources (import_tool, etc.)."""
         if self._admin is None:
             from .resources.admin import AdminNamespace
-
             self._admin = AdminNamespace(self)
         return self._admin
 
     @property
     def ownership(self) -> "OwnershipNamespace":
-        """Access ownership resources (entities, groups, etc.)."""
         if self._ownership is None:
             from .resources.ownership import OwnershipNamespace
-
             self._ownership = OwnershipNamespace(self)
         return self._ownership
 
-    def _request(
-            self,
-            method: str,
-            endpoint: str,
-            *,
-            json: Optional[Dict[str, Any]] = None,
-            data: Optional[str] = None,
-            params: Optional[Dict[str, Any]] = None,
-            headers: Optional[Dict[str, str]] = None,
-            **kwargs: Any,
-        ) -> requests.Response:
+    def request(self, method: str, endpoint: str, **kwargs: Any) -> requests.Response:
+        """Make a raw API request, retaining response and unknown JSON fields.
+
+        Read requests retry transient failures by default. Writes require an
+        explicit ``retry=True``; callers must ensure replay is safe. Per-call
+        ``timeout``, ``headers``, ``params``, ``json``, and ``stream`` are accepted.
         """
-        Make an HTTP request to the Addepar API.
+        return self._transport.request(method, endpoint, **kwargs)
 
-        Args:
-            method: HTTP method (GET, POST, PATCH, DELETE)
-            endpoint: API endpoint (e.g., "/jobs", "/imports")
-            json: JSON body (for application/vnd.api+json)
-            data: Raw body data (for text/plain, like CSV)
-            params: Query parameters
-            headers: Additional headers (merged with session headers)
-            **kwargs: Additional arguments passed to requests
+    def _request(self, method: str, endpoint: str, **kwargs: Any) -> requests.Response:
+        return self.request(method, endpoint, **kwargs)
 
-        Returns:
-            requests.Response object
+    def request_deadline(self, deadline: float) -> Any:
+        return self._transport.request_deadline(deadline)
 
-        Raises:
-            AuthenticationError: On 401 responses
-            RateLimitError: On 429 responses
-            ValidationError: On 400/422 responses
-            NotFoundError: On 404 responses
-            AddePyError: On other error responses
+    def iter_pages(self, endpoint: str, **kwargs: Any) -> Any:
+        """Iterate complete JSON:API pages, including included, links and meta."""
+        from .resources.base import BaseResource
+        return BaseResource(self).iter_pages(endpoint, **kwargs)
+
+    def download(self, endpoint: str, path: Any, *, chunk_size: int = 65536,
+                 overwrite: bool = False, **request_kwargs: Any) -> Path:
+        """Stream to an atomic file; failures never leave partial results.
+
+        Caller chooses the filename. Existing files are preserved unless
+        ``overwrite=True``. Cross-host GET redirects use a credential-free session.
         """
-        url = f"{self._base_url}{endpoint}"
-
-        response = self._session.request(
-            method=method,
-            url=url,
-            json=json,
-            data=data,
-            params=params,
-            headers=headers,
-            timeout=kwargs.pop("timeout", DEFAULT_REQUEST_TIMEOUT),
-            **kwargs,
-        )
-
-        # Handle error responses
-        if not response.ok:
-            self._handle_error_response(response)
-
-        return response
+        target = Path(path)
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be positive")
+        if target.exists() and not overwrite:
+            raise FileExistsError(target)
+        request_kwargs["stream"] = True
+        response = self.request("GET", endpoint, **request_kwargs)
+        temporary = None
+        try:
+            with tempfile.NamedTemporaryFile(dir=target.parent, prefix=f".{target.name}.", delete=False) as handle:
+                temporary = Path(handle.name)
+                for chunk in response.iter_content(chunk_size=chunk_size):
+                    if chunk:
+                        handle.write(chunk)
+            if overwrite:
+                os.replace(temporary, target)
+            else:
+                # Linking protects against concurrent destination creation too.
+                os.link(temporary, target)
+            return target
+        finally:
+            response.close()
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
 
     def _handle_error_response(self, response: requests.Response) -> None:
-        """Raise appropriate exception based on response status code."""
-        status = response.status_code
-        try:
-            error_data = response.json()
-            message = str(error_data)
-        except Exception:
-            message = response.text or f"HTTP {status} error"
-
-        if status == 401:
-            raise AuthenticationError(message, response)
-        elif status == 403:
-            raise ForbiddenError(message, response)
-        elif status == 404:
-            raise NotFoundError(message, response)
-        elif status == 409:
-            raise ConflictError(message, response)
-        elif status == 410:
-            raise GoneError(message, response)
-        elif status == 429:
-            retry_after = response.headers.get("X-RateLimit-Retry-After")
-            raise RateLimitError(
-                message,
-                response,
-                retry_after=int(retry_after) if retry_after else None,
-            )
-        elif status in (400, 422):
-            raise ValidationError(message, response)
-        else:
-            raise AddePyError(message, response)
+        raise_api_error(response)
 
     def close(self) -> None:
-        """Close the HTTP session."""
-        self._session.close()
+        self._transport.close()
 
     def __enter__(self) -> "AddePy":
         return self
 
-    def __exit__(
-        self,
-        exc_type: Optional[type],
-        exc_val: Optional[BaseException],
-        exc_tb: Optional[Any],
-    ) -> None:
+    def __exit__(self, *args: Any) -> None:
         self.close()
+
+
+# Older resource annotations used this name; keep downstream imports valid.
+AddeparClient = AddePy
