@@ -470,7 +470,12 @@ def _check_job(
     )
     _job_metadata(result, job_id, document)
     response = resource.get_job_results(job_id, stream=True)
+    result.http_status = response.status_code
     try:
+        if not 200 <= response.status_code < 300:
+            raise ProtocolError(
+                "The query download did not return a successful response.", response
+            )
         payload = bytearray()
         for chunk in response.iter_content(chunk_size=65536):
             if len(payload) + len(chunk) > max_result_bytes:
@@ -499,15 +504,30 @@ def _check_job(
                     response,
                 )
             attributes = item.get("attributes")
-            if (
-                isinstance(attributes, dict)
-                and "status" in attributes
-                and (expected is dict or "job_type" in attributes)
+            if not isinstance(attributes, dict):
+                result.status, result.detail = (
+                    "contract_failure",
+                    "Downloaded query resources lack the documented attributes object; compatibility is unverified.",
+                )
+                return
+            if "status" in attributes and (
+                expected is dict or "job_type" in attributes
             ):
                 raise ProtocolError(
                     "The download returned job status rather than query results.",
                     response,
                 )
+            if expected is dict:
+                total = attributes.get("total")
+                if not isinstance(total, dict) or not (
+                    isinstance(total.get("columns"), dict)
+                    or isinstance(total.get("children"), list)
+                ):
+                    result.status, result.detail = (
+                        "contract_failure",
+                        "The portfolio result lacks data.attributes.total with columns or children; compatibility is unverified.",
+                    )
+                    return
     finally:
         response.close()
     result.status, result.detail = (

@@ -369,7 +369,20 @@ def test_export_query_default_permission_and_sanitized_job_report(
                 }
             },
         ),
-        (200, {"data": {"private_result": PRIVATE_VALUE}}),
+        (
+            200,
+            {
+                "data": {
+                    "type": "portfolio_views",
+                    "attributes": {
+                        "total": {
+                            "columns": {"value": 42, "private_result": PRIVATE_VALUE},
+                            "children": [],
+                        }
+                    },
+                }
+            },
+        ),
     ]
     code, report, markdown, adapter = run_cli(
         monkeypatch,
@@ -612,6 +625,10 @@ def test_wrapper_cannot_hide_missing_json_api_data_by_returning_empty_list(
     [
         {},
         {"data": {}},
+        {"data": {"anything": "x"}},
+        {"data": {"attributes": {}}},
+        {"data": {"attributes": {"total": {}}}},
+        {"data": {"attributes": {"total": {"columns": [], "children": {}}}}},
         {"data": {"type": "jobs", "attributes": {"status": "Queued"}}},
         {"data": {"type": "portfolio_query", "attributes": {"status": "Completed"}}},
         {"data": {"attributes": {"status": "Queued", "job_type": "PORTFOLIO_QUERY"}}},
@@ -661,6 +678,110 @@ def test_transaction_download_rejects_job_status_even_in_data_array(
     )
     assert code == 1
     assert report["checks"][0]["status"] == "contract_failure"
+
+
+@pytest.mark.parametrize("row", [{}, {"attributes": None}, {"attributes": []}])
+def test_transaction_download_requires_attributes_object_on_every_row(
+    monkeypatch, tmp_path, env_file, row
+):
+    fixtures = [
+        (200, {"data": {"attributes": {"status": "Completed"}}}),
+        (200, {"data": [{"attributes": {"value": 42}}, row]}),
+    ]
+    code, report, _, _ = run_cli(
+        monkeypatch,
+        tmp_path,
+        env_file,
+        fixtures,
+        "--only",
+        "transaction_job",
+        "--transaction-job-id",
+        "job-123",
+    )
+    assert code == 1
+    assert report["checks"][0]["status"] == "contract_failure"
+
+
+@pytest.mark.parametrize(
+    "name,body",
+    [
+        (
+            "portfolio",
+            {
+                "data": {
+                    "type": "portfolio_views",
+                    "attributes": {
+                        "total": {"columns": {"custom_field": PRIVATE_VALUE}}
+                    },
+                    "unknown": True,
+                }
+            },
+        ),
+        (
+            "portfolio",
+            {
+                "data": {
+                    "attributes": {"total": {"children": []}, "unknown": PRIVATE_VALUE}
+                }
+            },
+        ),
+        (
+            "transaction",
+            {
+                "data": [
+                    {
+                        "type": "transaction_query",
+                        "attributes": {"value": 42, "unknown": PRIVATE_VALUE},
+                        "future_field": True,
+                    }
+                ]
+            },
+        ),
+    ],
+)
+def test_documented_query_result_layouts_allow_unknown_fields_without_reporting_values(
+    monkeypatch, tmp_path, env_file, name, body
+):
+    fixtures = [(200, {"data": {"attributes": {"status": "Completed"}}}), (200, body)]
+    code, report, markdown, _ = run_cli(
+        monkeypatch,
+        tmp_path,
+        env_file,
+        fixtures,
+        "--only",
+        name + "_job",
+        "--" + name + "-job-id",
+        "job-123",
+    )
+    assert code == 0
+    assert report["checks"][0]["status"] == "pass"
+    assert PRIVATE_VALUE not in json.dumps(report) + markdown
+
+
+@pytest.mark.parametrize(
+    "name,body",
+    [
+        ("portfolio", {"data": {"attributes": {"total": {"columns": {"value": 42}}}}}),
+        ("transaction", {"data": []}),
+    ],
+)
+def test_query_download_requires_http_success_even_with_valid_json(
+    monkeypatch, tmp_path, env_file, name, body
+):
+    fixtures = [(200, {"data": {"attributes": {"status": "Completed"}}}), (300, body)]
+    code, report, _, _ = run_cli(
+        monkeypatch,
+        tmp_path,
+        env_file,
+        fixtures,
+        "--only",
+        name + "_job",
+        "--" + name + "-job-id",
+        "job-123",
+    )
+    assert code == 1
+    assert report["checks"][0]["status"] == "contract_failure"
+    assert report["checks"][0]["http_status"] == 300
 
 
 def test_interrupted_wait_still_writes_report_with_submitted_job_id(
