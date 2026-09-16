@@ -126,7 +126,7 @@ def test_external_pagination_link_is_rejected():
                 "GET", "/entities"
             )
 
-    client = AddePy("example", "1", "encoded", load_env=False, session=Session())
+    client = AddePy("example", "1", "encoded", session=Session())
     with pytest.raises(ValueError):
         list(client.iter_pages("/entities"))
 

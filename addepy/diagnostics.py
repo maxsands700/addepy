@@ -17,11 +17,11 @@ import time
 from typing import Any
 from urllib.parse import urlparse
 
-from dotenv import dotenv_values
 import requests
 
 from ._version import __version__
 from .client import AddePy
+from .configuration import read_dotenv
 from .exceptions import (
     AddePyError,
     AddePyTimeoutError,
@@ -633,7 +633,7 @@ def configuration(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
         raise DiagnosticConfigError(
             "Choose an existing credential file with --env-file; no default .env file is loaded."
         )
-    values = dotenv_values(args.env_file, interpolate=False)
+    values = read_dotenv(args.env_file)
     environment = args.environment or values.get("ADDEPAR_ENVIRONMENT")
     base_url = args.base_url or values.get("ADDEPAR_BASE_URL")
     if environment is not None and environment not in {
@@ -692,7 +692,6 @@ def configuration(args: argparse.Namespace) -> tuple[dict[str, Any], list[str]]:
     settings = {
         "base_url": base_url,
         "firm_id": firm_id,
-        "load_env": False,
         "environment": environment
         or (
             actual_environment

@@ -8,9 +8,9 @@ import tempfile
 from typing import TYPE_CHECKING, Any, Callable, Optional
 
 import requests
-from dotenv import load_dotenv
 
 from ._version import __version__
+from .configuration import read_dotenv, repository_dotenv, settings_from_mapping
 from .constants import DEFAULT_CONTENT_TYPE, DEFAULT_REQUEST_TIMEOUT
 from .exceptions import RequestTimeoutError, TransportError
 from .transport import Transport, raise_api_error
@@ -26,9 +26,9 @@ class AddePy:
 
     ``api_key`` remains the base64-encoded key:secret pair used by earlier
     releases. Alternatively pass ``key_id``/``key_secret``, ``access_token``, or
-    a callable ``token_provider``. Explicit credentials override environment
-    credentials. Injected sessions belong to the caller and are not closed.
-    ``load_env=False`` skips .env loading; it still permits environment variables.
+    a callable ``token_provider``. The constructor uses only explicit settings;
+    use ``from_env()`` or ``from_dotenv()`` to select a configuration source.
+    Injected sessions belong to the caller and are not closed.
     """
 
     def __init__(
@@ -36,7 +36,6 @@ class AddePy:
         firm_name: Optional[str] = None,
         firm_id: Optional[str] = None,
         api_key: Optional[str] = None,
-        load_env: bool = True,
         *,
         key_id: Optional[str] = None,
         key_secret: Optional[str] = None,
@@ -50,11 +49,9 @@ class AddePy:
         session: Optional[requests.Session] = None,
         download_session: Optional[requests.Session] = None,
     ) -> None:
-        if load_env:
-            load_dotenv()
-        self._firm_name = firm_name or os.getenv("ADDEPAR_FIRM_NAME")
-        self._firm_id = str(firm_id or os.getenv("ADDEPAR_FIRM_ID") or "")
-        self.environment = environment or os.getenv("ADDEPAR_ENVIRONMENT", "production")
+        self._firm_name = firm_name
+        self._firm_id = str(firm_id if firm_id is not None else "")
+        self.environment = environment if environment is not None else "production"
         suffixes = {
             "production": "addepar.com",
             "development": "clientdev.addepar.com",
@@ -62,7 +59,7 @@ class AddePy:
         }
         if self.environment not in suffixes:
             raise ValueError("environment must be production, development, or sandbox")
-        self._base_url = base_url or os.getenv("ADDEPAR_BASE_URL")
+        self._base_url = base_url
         if not self._base_url:
             if not self._firm_name or not re.fullmatch(
                 r"[A-Za-z0-9](?:[A-Za-z0-9-]*[A-Za-z0-9])?", self._firm_name
@@ -72,16 +69,7 @@ class AddePy:
                 f"https://{self._firm_name}.{suffixes[self.environment]}/api/v1"
             )
         if not self._firm_id:
-            raise ValueError("Missing firm_id/ADDEPAR_FIRM_ID")
-
-        explicit_auth = any(
-            v is not None
-            for v in (api_key, key_id, key_secret, access_token, token_provider)
-        )
-        if not explicit_auth:
-            access_token = os.getenv("ADDEPAR_ACCESS_TOKEN")
-            if not access_token:
-                api_key = os.getenv("ADDEPAR_API_KEY")
+            raise ValueError("Missing firm_id")
         if (key_id is None) != (key_secret is None):
             raise ValueError("key_id and key_secret must be supplied together")
         if (
@@ -105,6 +93,8 @@ class AddePy:
             "User-Agent": f"addepy/{__version__}",
         }
         if key_id is not None:
+            if not key_id.strip() or not key_secret.strip():
+                raise ValueError("key_id and key_secret cannot be empty")
             api_key = base64.b64encode(f"{key_id}:{key_secret}".encode()).decode(
                 "ascii"
             )
@@ -132,6 +122,34 @@ class AddePy:
         self._portfolio: Optional["PortfolioNamespace"] = None
         self._admin: Optional["AdminNamespace"] = None
         self._ownership: Optional["OwnershipNamespace"] = None
+
+    @classmethod
+    def from_env(cls, **overrides: Any) -> "AddePy":
+        """Construct from process ADDEPAR_* variables, without reading any file.
+
+        Explicit arguments override source values. Supplying any authentication
+        argument replaces the entire source authentication method; a key pair
+        must therefore be supplied together.
+        """
+        return cls(**settings_from_mapping(os.environ, overrides))
+
+    @classmethod
+    def from_dotenv(
+        cls, path: str | os.PathLike[str] | None = None, **overrides: Any
+    ) -> "AddePy":
+        """Construct from exactly one .env file without using process variables.
+
+        With no path, find the nearest Git repository from the current working
+        directory and read only its root .env. Missing repositories or files
+        raise FileNotFoundError. Explicit paths work outside Git repositories;
+        relative paths are resolved from the current working directory.
+
+        File values are literal: variable interpolation is disabled and the
+        process environment is never modified. Explicit arguments override file
+        values, with authentication replaced as a complete method.
+        """
+        selected = repository_dotenv() if path is None else path
+        return cls(**settings_from_mapping(read_dotenv(selected), overrides))
 
     @property
     def base_url(self) -> str:

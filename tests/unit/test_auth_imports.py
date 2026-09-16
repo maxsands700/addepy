@@ -79,7 +79,7 @@ def test_token_provider_is_used_by_client():
     session = Mock(spec=requests.Session)
     session.request.return_value = response({"data": []})
     client = AddePy(
-        "example", "1", token_provider=provider, session=session, load_env=False
+        "example", "1", token_provider=provider, session=session
     )
     client.request("GET", "/entities")
     provider.assert_called_once_with()
@@ -148,7 +148,7 @@ def test_oauth_refresh_inherits_client_deadline(monkeypatch):
     api_session = Mock(spec=requests.Session)
     api_session.request.return_value = response({"data": []})
     client = AddePy(
-        "example", "1", token_provider=provider, session=api_session, load_env=False
+        "example", "1", token_provider=provider, session=api_session
     )
     with client.request_deadline(101):
         client.request("GET", "/entities")

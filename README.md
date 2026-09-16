@@ -27,18 +27,30 @@ The pytest suite runs entirely offline and blocks network connections. To verify
 
 **Configure a client**
 
-Copy [.env.example](.env.example) to a private `.env` and fill in your environment and credentials. The private `.env` file is ignored by Git.
+Choose the configuration source explicitly:
+
+- `AddePy(...)` uses only the settings passed to its constructor.
+- `AddePy.from_env(...)` reads the process's `ADDEPAR_*` environment variables.
+- `AddePy.from_dotenv(...)` reads one `.env` file.
+
+For a local project, copy [.env.example](.env.example) to a private `.env` at your consuming Git repository's root and fill in your credentials. This repository ignores `.env`; add it to your application's `.gitignore` too.
 
 ```python
 from addepy import AddePy
 
-with AddePy() as client:  # Loads .env and ADDEPAR_* environment variables
+with AddePy.from_dotenv() as client:
     entities = client.ownership.entities.list_entities(limit=10)
 ```
 
+With no path, `from_dotenv()` starts at the current working directory and finds the nearest ancestor containing a `.git` directory or file, including worktrees. It reads only that repository's root `.env`. A missing repository or root file raises an error; nested `.env` files and files above the repository are not searched. Use `AddePy.from_dotenv(".env.sandbox")` for another file; explicit relative paths resolve from the current working directory, and relative or absolute paths also work outside Git repositories.
+
+Both factories accept keyword overrides. They do not merge file settings with process variables, interpolate values, or modify the process environment. An explicit authentication option replaces all authentication loaded from the source; overriding a key pair requires both `key_id` and `key_secret`.
+
 `ADDEPAR_API_KEY` is the existing **base64-encoded `key_id:key_secret` pair**, optionally prefixed with `Basic `. OAuth uses `ADDEPAR_ACCESS_TOKEN` instead. The detailed [authentication guide](https://developers.addepar.com/docs/basic-authentication) documents both mechanisms.
 
-Explicit configuration is also supported:
+The factories also recognize `ADDEPAR_KEY_ID`/`ADDEPAR_KEY_SECRET`, `ADDEPAR_FIRM_NAME`, `ADDEPAR_FIRM_ID`, `ADDEPAR_ENVIRONMENT`, and `ADDEPAR_BASE_URL`. The environment defaults to `production` when omitted; the example file selects `sandbox`.
+
+For explicit configuration:
 
 ```python
 client = AddePy(
@@ -47,11 +59,10 @@ client = AddePy(
     key_id="your-key-id",
     key_secret="your-key-secret",
     environment="sandbox",  # production, development, or sandbox
-    load_env=False,
 )
 ```
 
-Use `base_url="https://yourfirm.sandbox.addepar.com/api/v1"` for an explicit API base. `load_env=False` skips reading `.env`; ordinary environment variables remain available as fallbacks. Explicit authentication overrides environment credentials. A custom `requests.Session` can be supplied as `session=`; the caller owns its lifecycle.
+Use `base_url="https://yourfirm.sandbox.addepar.com/api/v1"` for an explicit API base. The constructor has no file or environment fallback, and `load_env` has been removed. A custom `requests.Session` can be supplied as `session=`; the caller owns its lifecycle.
 
 **Run copied raw queries**
 
@@ -61,7 +72,7 @@ Copy the query JSON from Addepar into a private file. Both job resources accept 
 from pathlib import Path
 from addepy import AddePy
 
-with AddePy() as client:
+with AddePy.from_dotenv() as client:
     portfolio = Path("live-queries/portfolio.json").read_text(encoding="utf-8")
     transactions = Path("live-queries/transactions.json").read_text(encoding="utf-8")
 
@@ -74,14 +85,14 @@ Argument helpers (`create_query_job`, `create_view_job`) remain available. `exec
 For long-running jobs, keep the ID and download to a file:
 
 ```python
-with AddePy() as client:
+with AddePy.from_dotenv() as client:
     query = Path("live-queries/portfolio.json").read_text(encoding="utf-8")
     job_id = client.portfolio.jobs.create_job(query)
     client.portfolio.jobs.wait_for_job(job_id, timeout=1200)
     client.portfolio.jobs.download_job_results(job_id, "portfolio.json")
 
 # After a local timeout or process restart, reuse the saved ID:
-with AddePy() as client:
+with AddePy.from_dotenv() as client:
     response = client.portfolio.jobs.resume_job(job_id)
 ```
 

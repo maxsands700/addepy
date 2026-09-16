@@ -41,6 +41,8 @@ The sandbox must actually be provisioned for your firm; changing a URL does not 
 
 Choose exactly one credential method: `ADDEPAR_API_KEY`, `ADDEPAR_ACCESS_TOKEN` (OAuth), or the pair `ADDEPAR_KEY_ID`/`ADDEPAR_KEY_SECRET`. The live command reads only the explicit credential file, disables variable interpolation, and does not use ambient credentials or `.netrc`. Tokens can expire during a run; use fresh credentials when retrying an authentication-blocked check.
 
+Diagnostics always require `--env-file`; SDK factory defaults do not apply. Relative paths resolve from the current working directory, so the command also works in an extracted source archive without Git metadata. Application code can read the same file with `AddePy.from_dotenv(".env.sandbox")`. No-argument `AddePy.from_dotenv()` instead requires a consuming Git repository and its root `.env`; `AddePy.from_env()` reads process variables, and `AddePy(...)` uses only explicit arguments.
+
 ```bash
 python -m addepy.diagnostics --env-file .env.sandbox
 ```

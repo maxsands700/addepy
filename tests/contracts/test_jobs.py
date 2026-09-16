@@ -42,7 +42,6 @@ def client_for(fixtures):
         firm_name="example",
         firm_id="1",
         api_key="credentials",
-        load_env=False,
         session=session,
     )
     return client, session

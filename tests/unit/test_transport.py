@@ -37,7 +37,7 @@ def client_with(*replies, **kwargs):
     session = Mock(spec=requests.Session)
     session.request.side_effect = replies
     return AddePy(
-        "example", "1", "encoded", load_env=False, session=session, **kwargs
+        "example", "1", "encoded", session=session, **kwargs
     ), session
 
 
@@ -60,12 +60,12 @@ def test_environment_urls_and_basic_headers(environment, host):
     assert kwargs["timeout"] == (10, 60)
 
 
-def test_explicit_bearer_overrides_environment_basic(monkeypatch):
+def test_explicit_bearer_ignores_environment_basic(monkeypatch):
     monkeypatch.setenv("ADDEPAR_API_KEY", "old")
     session = Mock(spec=requests.Session)
     session.request.return_value = response()
     with AddePy(
-        "example", "1", access_token="fresh", session=session, load_env=False
+        "example", "1", access_token="fresh", session=session
     ) as client:
         client.request("GET", "/entities")
     assert (
@@ -83,7 +83,6 @@ def test_key_pair_encoding():
         key_id="key",
         key_secret="secret",
         session=session,
-        load_env=False,
     )
     client.request("GET", "/entities")
     assert (
@@ -105,7 +104,7 @@ def test_key_pair_encoding():
 )
 def test_invalid_configuration(kwargs):
     with pytest.raises(ValueError):
-        AddePy("example", "1", load_env=False, **kwargs)
+        AddePy("example", "1", **kwargs)
 
 
 @pytest.mark.parametrize(
@@ -391,7 +390,7 @@ def test_explicit_sdk_credentials_override_session_and_netrc_auth(monkeypatch):
     monkeypatch.setattr(
         "requests.sessions.get_netrc_auth", lambda _: ("netrc", "secret")
     )
-    client = AddePy("example", "1", "encoded", session=session, load_env=False)
+    client = AddePy("example", "1", "encoded", session=session)
     client.request("GET", "/entities")
     session.auth = None
     client.request("GET", "/entities")

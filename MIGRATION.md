@@ -2,6 +2,23 @@
 
 Existing namespaces and public job helpers remain available. The release adds capabilities and tightens incorrect behavior; no wholesale client rewrite is needed in calling applications.
 
+Client configuration is now explicit. Replace `AddePy()` with the factory for your source:
+
+```python
+from addepy import AddePy
+
+client = AddePy.from_dotenv()               # Consuming Git repository's root .env
+# Or:
+client = AddePy.from_env()                  # Process ADDEPAR_* variables only
+client = AddePy.from_dotenv(".env.sandbox")  # Explicit file, relative to the working directory
+```
+
+`load_env` is removed. Replace `AddePy(load_env=False)` with `AddePy.from_env()` if you relied on process variables. Otherwise supply all settings to `AddePy(...)`; the constructor reads no files or environment variables.
+
+No-argument `from_dotenv()` requires the nearest Git root's `.env`, searching upward from the working directory and recognizing `.git` directories or worktree files. It never uses nested files or searches above that root. Missing configuration raises an error; an explicit path works outside Git repositories.
+
+Factory keywords override source values. File/process settings are never merged, values are not interpolated, and loading never changes the process environment. Authentication overrides replace the whole source authentication group; supply both `key_id` and `key_secret` for a pair. Configure exactly one authentication method in the selected source; conflicting methods now raise an error instead of giving an OAuth token precedence. The environment still defaults to `production`.
+
 | Area | Action or behavior change |
 | --- | --- |
 | pandas | Install `addepy[dataframe]` if your application uses pandas. Core CSV/file imports work without it. |

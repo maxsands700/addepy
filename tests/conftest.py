@@ -12,7 +12,6 @@ def offline_only(monkeypatch):
     for name in list(os.environ):
         if name.startswith("ADDEPAR_"):
             monkeypatch.delenv(name)
-    monkeypatch.setattr("addepy.client.load_dotenv", lambda *args, **kwargs: None)
 
     def blocked(*args, **kwargs):
         raise AssertionError(

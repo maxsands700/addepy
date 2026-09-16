@@ -231,7 +231,7 @@ def test_configuration_does_not_fall_back_to_ambient_env_or_dotenv(
     settings, _ = diagnostics.configuration(args)
     assert settings["base_url"] == SANDBOX
     assert settings["api_key"] == PRIVATE_TOKEN
-    assert settings["load_env"] is False
+    assert "load_env" not in settings
     env_file.write_text(
         "ADDEPAR_FIRM_ID=1\nADDEPAR_ENVIRONMENT=sandbox\nADDEPAR_FIRM_NAME=example\n"
     )

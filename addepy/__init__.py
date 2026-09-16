@@ -4,7 +4,8 @@ Addepy - Python SDK for the Addepar API.
 Usage:
     from addepy import AddePy
 
-    client = AddePy()
+    client = AddePy.from_dotenv()  # Consuming Git repository's root .env
+    # Use AddePy.from_env() for process variables or AddePy(...) for explicit settings.
 
     # Portfolio jobs
     job_id = client.portfolio.jobs.create_job(query_dict)
