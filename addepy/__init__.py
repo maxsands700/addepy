@@ -1,25 +1,4 @@
-"""
-Addepy - Python SDK for the Addepar API.
-
-Usage:
-    from addepy import AddePy
-
-    client = AddePy.from_dotenv()  # Consuming Git repository's root .env
-    # Use AddePy.from_env() for process variables or AddePy(...) for explicit settings.
-
-    # Portfolio jobs
-    job_id = client.portfolio.jobs.create_job(query_dict)
-    results = client.portfolio.jobs.execute_portfolio_query(query_dict)
-
-    # Import tool
-    import_id = client.admin.import_tool.create_import(df, 'TRANSACTIONS')
-    results = client.admin.import_tool.execute_import(df, 'TRANSACTIONS')
-
-Logging:
-    import logging
-    logging.getLogger("addepy").setLevel(logging.DEBUG)
-    logging.getLogger("addepy").addHandler(logging.StreamHandler())
-"""
+"""Python SDK for Addepar. See README.md for setup and query examples."""
 
 import logging
 

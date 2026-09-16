@@ -1,7 +1,7 @@
 """Representative offline contracts from the linked ownership and query guides.
 
 Fixtures exercise documented wire shapes, not an available Addepar tenant.
-Documentation sources and known ambiguities are in API_NOTES_INVESTMENT.md.
+See docs/resources.md for ownership and query conventions.
 """
 
 from copy import deepcopy

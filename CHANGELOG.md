@@ -27,7 +27,7 @@ All notable changes to this project will be documented in this file.
 - File uploads use the shared authenticated transport.
 - README method aliases and package version metadata are consistent.
 
-See MIGRATION.md, TESTING.md, and docs/API_COVERAGE.md for behavior changes and live-verification limits.
+See [migration](MIGRATION.md), [resources](docs/resources.md), and [development](docs/development.md) for upgrade instructions, API usage, and testing.
 
 ## [0.2.0] - 2025-12-12
 

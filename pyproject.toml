@@ -14,12 +14,12 @@ authors = [
 ]
 keywords = ["addepar", "api", "sdk", "finance", "wealth-management"]
 classifiers = [
-    "Development Status :: 3 - Alpha",
     "Intended Audience :: Developers",
     "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
 ]
 dependencies = [
     "requests>=2.32.0",
@@ -42,7 +42,6 @@ addepy = ["py.typed"]
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 addopts = "-ra --strict-markers --import-mode=importlib"
-markers = ["live: requires explicit --live and Addepar credentials"]
 
 [tool.ruff]
 target-version = "py310"

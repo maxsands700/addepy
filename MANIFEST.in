@@ -1,5 +1,4 @@
 include .env.example
-include MIGRATION.md TESTING.md REVAMP_PROPOSAL.md
-include API_NOTES_ADMIN.md API_NOTES_INVESTMENT.md
+include MIGRATION.md CHANGELOG.md
 recursive-include docs *.md
-recursive-include tests *.py *.json
+recursive-include tests *.py
