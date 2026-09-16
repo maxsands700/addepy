@@ -67,6 +67,8 @@ python -m addepy.diagnostics --env-file .env.sandbox --only portfolio_job --port
 
 Transaction jobs use `--only transaction_job --transaction-job-id YOUR_JOB_ID`. Results expire according to Addepar's retention policy. `--read-only` prevents all job submissions while allowing an existing job to be inspected.
 
+Live portfolio jobs have been confirmed to return completed results from the status endpoint without a status field, contrary to the online documentation. The SDK recognizes a valid portfolio result structure as completion, then the diagnostics download and validate the result. Earlier SDK versions could report `contract_failure` with a placeholder `Pending` and `null` progress for this response; update the checkout and resume the existing job to verify the full workflow.
+
 **4. Check additional endpoints or use production**
 
 ```bash
@@ -104,5 +106,7 @@ Exit codes: **0** means all selected checks passed; **1** means a contract/inter
 The default job wait is 120 seconds; `--job-timeout` increases it. `--poll-interval` defaults to 5 seconds, and `--request-timeout` to 30 seconds. Result inspection is capped at 10 MiB by default; use a smaller query or increase `--max-result-bytes`. Live checks disable automatic retries and stop after rate limiting instead of consuming more quota.
 
 Reports contain check names, documentation links, outcomes, HTTP status where available, durations, and export job IDs/status/progress. They omit credentials, query values, firm identifiers, and response data. `test-results/`, `.env*` credential files, and `live-queries/` are ignored by Git. Review any additional diagnostics you capture before sharing them.
+
+Job status remains `null` until observed or inferred from completed portfolio results; missing progress remains `null`. A `Completed` job status alone does not establish a passing check: downloading and validating the result must also succeed.
 
 Bring back the Markdown/JSON reports and the local Git commit ID (`git rev-parse HEAD`), or the commit suffix in the source archive filename. Those reports identify what worked, what failed, and what could not be tested. Write compatibility and the [documented API ambiguities](docs/API_COVERAGE.md) still require separate confirmation; the safe live suite deliberately does not exercise business-data writes.

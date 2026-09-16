@@ -20,7 +20,8 @@ All notable changes to this project will be documented in this file.
 - HTTP exceptions retain status, structured errors and request IDs without copying bodies into their messages.
 
 ### Fixed
-- Missing job status no longer signals success; documented failure states terminate polling.
+- Portfolio polling recognizes completed result documents without a status, matching user-confirmed live behavior despite the online documentation. Other missing-status responses still fail; explicit failure states terminate polling.
+- Diagnostics no longer label jobs `Pending` before receiving a status; completed portfolio results are reported as `Completed` even when the API omits status and progress.
 - Bulk transaction/benchmark methods preserve caller inputs.
 - Historical-price submissions reject missing async job IDs.
 - File uploads use the shared authenticated transport.

@@ -24,7 +24,8 @@ Factory keywords override source values. File/process settings are never merged,
 | pandas | Install `addepy[dataframe]` if your application uses pandas. Core CSV/file imports work without it. |
 | Raw transaction jobs | Use `client.portfolio.transaction_jobs.execute_job(raw_query)` or `create_job(raw_query)`. Existing argument-based `execute_query_job(...)` remains available. |
 | Portfolio method names | `execute_job`, `execute_portfolio_query`, and `execute_portfolio_query_job` are supported aliases. The former README's missing method now exists. |
-| Job failures | Missing status raises `JobError`; it no longer defaults to success. Documented `Error` states now terminate polling. Catch `JobError` for structured server failure details. |
+| Portfolio completion | Live portfolio jobs can return results from `GET /jobs/{id}` without `data.attributes.status`, contrary to the online documentation. A valid portfolio result structure is recognized as completed; an explicit status takes precedence. `wait_for_job()` returns the original document, while resume/execute helpers still download results. |
+| Job failures | Missing status raises `JobError` unless the response is a valid completed portfolio result. Transaction jobs still require a status. Documented `Error` states terminate polling. Catch `JobError` for structured server failure details. |
 | Polling | Status is checked immediately. Waiting uses a monotonic deadline, including SDK-managed requests/retries and OAuth refresh. Invalid/zero polling intervals and timeouts raise `ValueError`. Local timeouts do not cancel remote jobs. |
 | Network failures | Requests connection/timeout failures become `TransportError`/`RequestTimeoutError`, with the original exception as their cause. |
 | HTTP errors | `status_code` is populated for failures. Exception text omits the response body; use `.errors` or `.response` explicitly when diagnosing locally. |

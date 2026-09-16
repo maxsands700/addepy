@@ -5,7 +5,9 @@ https://developers.addepar.com/docs/jobs
 https://developers.addepar.com/docs/transaction-jobs
 https://developers.addepar.com/docs/batched-jobs
 
-These validate documented request/response shapes, not a live API guarantee.
+These validate documented request/response shapes and the completed portfolio
+result returned by the status endpoint in a live diagnostic run. The fixtures
+are synthetic and do not constitute a live API guarantee.
 """
 
 from copy import deepcopy
@@ -183,6 +185,66 @@ def test_transaction_query_matches_documented_request_and_download_lifecycle():
         ("GET", "/transaction_jobs/transaction-123"),
         ("GET", "/transaction_jobs/transaction-123"),
         ("GET", "/transaction_jobs/transaction-123/download"),
+    ]
+
+
+def test_portfolio_query_accepts_live_completed_result_on_status_endpoint():
+    """The live portfolio endpoint returns results without the documented status."""
+    query = {
+        "data": {
+            "type": "portfolio_query",
+            "attributes": {
+                "portfolio_type": "entity",
+                "portfolio_id": [22],
+                "columns": [{"key": "value"}],
+                "future_option": {"values": [False, None, 0]},
+            },
+        }
+    }
+    original_query = deepcopy(query)
+    results = {
+        "meta": {"columns": [{"key": "value"}]},
+        "data": {
+            "type": "portfolio_query_results",
+            "attributes": {
+                "total": {
+                    "columns": {"value": 42},
+                    "children": [{"columns": {"value": 42}}],
+                }
+            },
+        },
+        "included": [],
+    }
+    queued_job = {
+        "data": {
+            "type": "jobs",
+            "id": "portfolio-123",
+            "attributes": {"status": "Queued"},
+        }
+    }
+    client, session = client_for(
+        [(202, queued_job), (200, queued_job), (200, results), (200, results)]
+    )
+
+    with client:
+        result = client.portfolio.jobs.execute_job(
+            query, initial_wait=0.001, max_wait=0.001
+        )
+
+    assert isinstance(result, requests.Response)
+    assert result.json() == results
+    assert query == original_query
+    assert (
+        session.calls[0][2]["json"]["data"]["attributes"]["parameters"]
+        == (query["data"]["attributes"])
+    )
+    assert [
+        (method, url.rsplit("/api/v1", 1)[1]) for method, url, _ in session.calls
+    ] == [
+        ("POST", "/jobs"),
+        ("GET", "/jobs/portfolio-123"),
+        ("GET", "/jobs/portfolio-123"),
+        ("GET", "/jobs/portfolio-123/download"),
     ]
 
 

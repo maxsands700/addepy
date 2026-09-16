@@ -3,6 +3,11 @@
 Run ``python -m addepy.diagnostics --env-file .env.sandbox``. Importing this
 module never reads credentials or makes requests. Reports contain outcomes,
 HTTP codes and job identifiers, never API bodies or copied query contents.
+
+Live portfolio jobs can return completed query results without a status field,
+contrary to the online job-status documentation. See portfolio/jobs.py's
+compatibility note. Report completion after the SDK recognizes it; do not use
+a synthetic "Pending" value when no server status was captured.
 """
 
 import argparse
@@ -35,6 +40,7 @@ from .exceptions import (
     TransportError,
     ValidationError,
 )
+from .resources.portfolio.jobs import _is_portfolio_result
 from .resources.query import query_parameters
 
 
@@ -464,11 +470,12 @@ def _check_job(
         query_parameters(query)  # Validate before any submission; retain raw input.
         job_id = resource.create_job(query)
     _job_metadata(result, job_id)
-    result.job_status = "Pending"
     document = resource.wait_for_job(
         job_id, timeout=timeout, initial_wait=poll_interval, max_wait=poll_interval
     )
     _job_metadata(result, job_id, document)
+    # A successful wait can return portfolio results without status/progress.
+    result.job_status = "Completed"
     response = resource.get_job_results(job_id, stream=True)
     result.http_status = response.status_code
     try:
@@ -518,14 +525,10 @@ def _check_job(
                     response,
                 )
             if expected is dict:
-                total = attributes.get("total")
-                if not isinstance(total, dict) or not (
-                    isinstance(total.get("columns"), dict)
-                    or isinstance(total.get("children"), list)
-                ):
+                if not _is_portfolio_result(document):
                     result.status, result.detail = (
                         "contract_failure",
-                        "The portfolio result lacks data.attributes.total with columns or children; compatibility is unverified.",
+                        "The portfolio result does not match the expected result structure; compatibility is unverified.",
                     )
                     return
     finally:

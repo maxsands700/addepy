@@ -1,4 +1,8 @@
-"""Shared lifecycle for portfolio and transaction export jobs."""
+"""Shared lifecycle for portfolio and transaction export jobs.
+
+Portfolio jobs also recognize completed result documents without a status;
+see the live API compatibility note in portfolio/jobs.py before changing polling.
+"""
 
 from collections.abc import Mapping
 from copy import deepcopy
@@ -107,7 +111,7 @@ class JobResource(BaseResource):
         return self._submit_job(self._query_job_type, query_parameters(query_dict))
 
     def get_job_status(self, job_id: str) -> dict[str, Any]:
-        """Return the complete JSON:API status document, including error details."""
+        """Return the unmodified JSON:API status or completed portfolio result."""
         response = self._get(f"{self._endpoint}/{job_id}")
         try:
             document = response.json()
@@ -150,10 +154,11 @@ class JobResource(BaseResource):
         backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
         timeout: float = DEFAULT_TIMEOUT,
     ) -> dict[str, Any]:
-        """Wait for an existing job and return its complete successful status.
+        """Wait and return the original successful status or portfolio result.
 
         Failures raise ``JobError`` with ``job_id``, ``status``, ``errors`` and
-        ``job_data``. Missing status is an invalid response, never success.
+        ``job_data``. Missing status is invalid unless the portfolio subclass
+        recognizes the completed result structure observed in the live API.
         Unrecognized states are polled until a known terminal state or timeout.
         A local timeout leaves the server job running for later resumption.
         """

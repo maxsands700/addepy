@@ -1,4 +1,18 @@
-"""Portfolio query and saved-view export jobs."""
+"""Portfolio query and saved-view export jobs.
+
+LIVE API COMPATIBILITY NOTE FOR MAINTAINERS:
+Addepar's online job-status documentation is incorrect for the completion path
+confirmed by a user against their live firm: GET /jobs/{id} can return the
+completed portfolio result itself (meta, data, included), without
+data.attributes.status. Its data.attributes.total contains columns and/or
+children. Requiring status="Completed" rejects these successful responses.
+
+Recognize this result structure as completion, preserving the original document.
+Do not restore the old blanket "missing status means success" fallback: empty,
+malformed, error, and job-status documents are not portfolio results. Explicit
+statuses still take precedence. This behavior is specific to portfolio jobs;
+transaction jobs retain their status-based lifecycle.
+"""
 
 from typing import Any
 
@@ -22,6 +36,30 @@ from ..job import (
 from ..query import QueryInput, query_parameters
 
 
+def _is_portfolio_result(document: Any) -> bool:
+    """Recognize the result envelope observed on completed portfolio jobs."""
+    if not isinstance(document, dict) or document.get("errors"):
+        return False
+    data = document.get("data")
+    if not isinstance(data, dict) or data.get("errors"):
+        return False
+    if data.get("type") in ("jobs", "job", "transaction_jobs"):
+        return False
+    attributes = data.get("attributes")
+    if (
+        not isinstance(attributes, dict)
+        or "status" in attributes
+        or "job_type" in attributes
+        or attributes.get("errors")
+    ):
+        return False
+    total = attributes.get("total")
+    return isinstance(total, dict) and (
+        isinstance(total.get("columns"), dict)
+        or isinstance(total.get("children"), list)
+    )
+
+
 class JobsResource(JobResource):
     """Portfolio exports with raw queries, optional builders, and resumable jobs.
 
@@ -37,6 +75,11 @@ class JobsResource(JobResource):
     _job_label = "portfolio job"
     _success_statuses = JOB_SUCCESS_STATUSES
     _failure_statuses = JOB_FAILURE_STATUSES
+
+    def _status(self, job_id: str, document: dict[str, Any]) -> str:
+        if _is_portfolio_result(document):
+            return "Completed"
+        return super()._status(job_id, document)
 
     def create_job(
         self,

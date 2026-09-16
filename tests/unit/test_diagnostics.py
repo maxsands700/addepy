@@ -435,6 +435,114 @@ def test_existing_transaction_job_can_resume_in_read_only_mode(
     assert all(request.method == "GET" for request in adapter.requests)
 
 
+@pytest.fixture
+def completed_portfolio_result():
+    return {
+        "meta": {"private": PRIVATE_VALUE},
+        "data": {
+            "type": "portfolio_views",
+            "attributes": {
+                "total": {
+                    "columns": {"value": 42},
+                    "children": [{"columns": {"private": PRIVATE_VALUE}}],
+                },
+            },
+        },
+        "included": [{"type": "entities", "attributes": {"name": PRIVATE_VALUE}}],
+    }
+
+
+@pytest.mark.parametrize("submit", [False, True])
+def test_portfolio_result_during_polling_completes_and_checks_download(
+    monkeypatch, tmp_path, env_file, completed_portfolio_result, submit
+):
+    fixtures = []
+    if submit:
+        query = tmp_path / "query.json"
+        query.write_text(json.dumps({"portfolio_id": PRIVATE_VALUE}))
+        options = ["--portfolio-query", str(query)]
+        fixtures.append((202, {"data": {"id": "job-123"}}))
+    else:
+        options = ["--portfolio-job-id", "job-123", "--read-only"]
+    fixtures.extend(
+        [
+            (200, {"data": {"attributes": {"status": "Queued"}}}),
+            (200, completed_portfolio_result),
+            (200, completed_portfolio_result),
+        ]
+    )
+    code, report, markdown, adapter = run_cli(
+        monkeypatch, tmp_path, env_file, fixtures, "--only", "portfolio_job", *options
+    )
+    assert code == 0
+    check = report["checks"][0]
+    assert (check["status"], check["job_status"], check["progress"]) == (
+        "pass",
+        "Completed",
+        None,
+    )
+    assert check["http_status"] == 200
+    assert [request.method for request in adapter.requests] == (
+        (["POST"] if submit else []) + ["GET", "GET", "GET"]
+    )
+    assert adapter.requests[-1].url.endswith("/jobs/job-123/download")
+    assert PRIVATE_VALUE not in json.dumps(report) + markdown
+    assert PRIVATE_TOKEN not in json.dumps(report) + markdown
+
+
+@pytest.mark.parametrize(
+    "http,body,outcome",
+    [
+        (200, {"data": {"attributes": {}}}, "contract_failure"),
+        (422, {"errors": [{"detail": PRIVATE_VALUE}]}, "contract_failure"),
+        (403, {"errors": [{"detail": PRIVATE_VALUE}]}, "permission_blocked"),
+    ],
+)
+def test_failed_job_poll_does_not_report_synthetic_pending(
+    monkeypatch, tmp_path, env_file, http, body, outcome
+):
+    _, report, markdown, adapter = run_cli(
+        monkeypatch,
+        tmp_path,
+        env_file,
+        [(http, body)],
+        "--only",
+        "portfolio_job",
+        "--portfolio-job-id",
+        "job-123",
+    )
+    check = report["checks"][0]
+    assert check["status"] == outcome
+    assert check["job_status"] is None
+    assert check["progress"] is None
+    assert check["job_id"] == "job-123"
+    assert len(adapter.requests) == 1
+    assert PRIVATE_VALUE not in json.dumps(report) + markdown
+
+
+def test_portfolio_result_during_polling_does_not_skip_download_validation(
+    monkeypatch, tmp_path, env_file, completed_portfolio_result
+):
+    fixtures = [
+        (200, completed_portfolio_result),
+        (200, {"data": {"attributes": {}}}),
+    ]
+    code, report, _, adapter = run_cli(
+        monkeypatch,
+        tmp_path,
+        env_file,
+        fixtures,
+        "--only",
+        "portfolio_job",
+        "--portfolio-job-id",
+        "job-123",
+    )
+    assert code == 1
+    assert report["checks"][0]["status"] == "contract_failure"
+    assert report["checks"][0]["job_status"] == "Completed"
+    assert adapter.requests[-1].url.endswith("/jobs/job-123/download")
+
+
 def test_failed_job_retains_id_but_no_private_error_details(
     monkeypatch, tmp_path, env_file
 ):

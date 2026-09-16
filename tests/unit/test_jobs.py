@@ -27,6 +27,18 @@ def job_document(status, *, errors=None):
     return {"data": {"id": "job-123", "attributes": attributes}}
 
 
+def portfolio_result_document(total):
+    """Synthetic example of the completed response confirmed against live jobs."""
+    return {
+        "meta": {"columns": [{"key": "value"}]},
+        "data": {
+            "type": "portfolio_query_results",
+            "attributes": {"total": total},
+        },
+        "included": [],
+    }
+
+
 class FakeClient:
     def __init__(self, *responses):
         self.responses = list(responses)
@@ -182,6 +194,181 @@ def test_wait_returns_full_success_document_without_downloading(resource_class):
         resource_class(client).wait_for_job("job-123", initial_wait=0.001) == document
     )
     assert len(client.calls) == 1
+
+
+@pytest.mark.parametrize(
+    "total",
+    [
+        {"columns": {}},
+        {"children": []},
+        {"columns": {}, "children": None},
+        {"columns": None, "children": []},
+        {"columns": {"value": 42}, "children": [{"columns": {"value": 42}}]},
+    ],
+)
+def test_portfolio_wait_accepts_completed_results_and_preserves_document(total):
+    document = portfolio_result_document(total)
+    original = deepcopy(document)
+    result_response = response(document)
+    result_response.json = lambda: document
+    client = FakeClient(response(job_document("Queued")), result_response)
+
+    completed = JobsResource(client).wait_for_job(
+        "job-123", initial_wait=0.001, max_wait=0.001
+    )
+
+    assert completed is document
+    assert completed == original
+    assert "status" not in completed["data"]["attributes"]
+    assert [call[:2] for call in client.calls] == [
+        ("GET", "/jobs/job-123"),
+        ("GET", "/jobs/job-123"),
+    ]
+
+
+@pytest.mark.parametrize("execute", [False, True], ids=["resume", "execute"])
+def test_portfolio_completed_results_still_download_and_preserve_query(execute):
+    document = portfolio_result_document({"columns": {"value": 42}, "children": []})
+    query = {"portfolio_id": "22", "future_option": {"values": [None, False, 0]}}
+    original_query = deepcopy(query)
+    download_response = response(document)
+    responses = [
+        response(job_document("Queued")),
+        response(document),
+        download_response,
+    ]
+    if execute:
+        responses.insert(0, response({"data": {"id": "job-123"}}, 202))
+    client = FakeClient(*responses)
+    resource = JobsResource(client)
+
+    if execute:
+        result = resource.execute_job(query, initial_wait=0.001, max_wait=0.001)
+    else:
+        result = resource.resume_job("job-123", initial_wait=0.001, max_wait=0.001)
+
+    assert result is download_response
+    assert query == original_query
+    expected_calls = [
+        ("GET", "/jobs/job-123"),
+        ("GET", "/jobs/job-123"),
+        ("GET", "/jobs/job-123/download"),
+    ]
+    if execute:
+        expected_calls.insert(0, ("POST", "/jobs"))
+        assert client.calls[0][2]["json"]["data"]["attributes"]["parameters"] == query
+    assert [call[:2] for call in client.calls] == expected_calls
+
+
+@pytest.mark.parametrize(
+    "total",
+    [
+        None,
+        [],
+        {},
+        {"value": 42},
+        {"columns": []},
+        {"children": {}},
+    ],
+)
+def test_portfolio_malformed_results_do_not_imply_completion(total):
+    document = portfolio_result_document(total)
+    client = FakeClient(response(document))
+
+    with pytest.raises(JobError) as caught:
+        JobsResource(client).resume_job("job-123", initial_wait=0.001)
+
+    assert caught.value.job_id == "job-123"
+    assert caught.value.job_data == document
+    assert [call[:2] for call in client.calls] == [("GET", "/jobs/job-123")]
+
+
+@pytest.mark.parametrize(
+    "contradiction",
+    [
+        "top_level_errors",
+        "data_errors",
+        "attribute_errors",
+        "job",
+        "jobs",
+        "transaction_jobs",
+        "job_type",
+    ],
+)
+def test_portfolio_result_shape_does_not_override_errors_or_job_metadata(contradiction):
+    document = portfolio_result_document({"columns": {}, "children": []})
+    errors = [{"detail": "The export failed"}]
+    if contradiction == "top_level_errors":
+        document["errors"] = errors
+    elif contradiction == "data_errors":
+        document["data"]["errors"] = errors
+    elif contradiction == "attribute_errors":
+        document["data"]["attributes"]["errors"] = errors
+    elif contradiction == "job_type":
+        document["data"]["attributes"]["job_type"] = "PORTFOLIO_QUERY"
+    else:
+        document["data"]["type"] = contradiction
+    client = FakeClient(response(document))
+
+    with pytest.raises(JobError) as caught:
+        JobsResource(client).resume_job("job-123", initial_wait=0.001)
+
+    assert caught.value.job_id == "job-123"
+    assert caught.value.job_data == document
+    assert [call[:2] for call in client.calls] == [("GET", "/jobs/job-123")]
+
+
+def test_portfolio_explicit_failure_takes_precedence_over_result_shape():
+    document = portfolio_result_document({"columns": {}, "children": []})
+    document["data"]["attributes"].update(
+        {"status": "Failed", "errors": [{"detail": "The export failed"}]}
+    )
+    client = FakeClient(response(document))
+
+    with pytest.raises(JobError) as caught:
+        JobsResource(client).resume_job("job-123", initial_wait=0.001)
+
+    assert caught.value.status == "Failed"
+    assert caught.value.errors == document["data"]["attributes"]["errors"]
+    assert caught.value.job_data == document
+    assert len(client.calls) == 1
+
+
+def test_portfolio_explicit_pending_status_keeps_polling_despite_result_shape():
+    document = portfolio_result_document({"columns": {}, "children": []})
+    document["data"]["attributes"]["status"] = "Queued"
+    completed = job_document("Completed")
+    client = FakeClient(response(document), response(completed))
+
+    assert (
+        JobsResource(client).wait_for_job("job-123", initial_wait=0.001, max_wait=0.001)
+        == completed
+    )
+    assert len(client.calls) == 2
+
+
+@pytest.mark.parametrize("status", [None, "", 0, []])
+def test_portfolio_explicit_invalid_status_is_not_replaced_by_result_shape(status):
+    document = portfolio_result_document({"columns": {}, "children": []})
+    document["data"]["attributes"]["status"] = status
+    client = FakeClient(response(document))
+
+    with pytest.raises(JobError):
+        JobsResource(client).resume_job("job-123", initial_wait=0.001)
+
+    assert len(client.calls) == 1
+
+
+def test_transaction_jobs_do_not_accept_portfolio_result_as_completion():
+    document = portfolio_result_document({"columns": {"value": 42}, "children": []})
+    client = FakeClient(response(document))
+
+    with pytest.raises(JobError) as caught:
+        TransactionJobsResource(client).resume_job("job-123", initial_wait=0.001)
+
+    assert caught.value.job_id == "job-123"
+    assert caught.value.job_data == document
+    assert [call[:2] for call in client.calls] == [("GET", "/transaction_jobs/job-123")]
 
 
 def test_invalid_status_json_retains_id_and_response(resource_class):
