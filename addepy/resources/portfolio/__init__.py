@@ -10,11 +10,13 @@ from .attributes import AttributesResource
 from .benchmarks import BenchmarksResource
 from .composite_securities import CompositeSecuritiesResource
 from .constituent_attributes import ConstituentAttributesResource
+from .estimated_returns import EstimatedReturnsResource
 from .historical_prices import HistoricalPricesResource
 from .jobs import JobsResource
 from .snapshots import SnapshotsResource
 from .transactions import TransactionsResource
 from .transaction_jobs import TransactionJobsResource
+from .underlying_assets import UnderlyingAssetsResource
 
 
 class PortfolioNamespace:
@@ -48,11 +50,13 @@ class PortfolioNamespace:
         self._benchmarks: Optional[BenchmarksResource] = None
         self._composite_securities: Optional[CompositeSecuritiesResource] = None
         self._constituent_attributes: Optional[ConstituentAttributesResource] = None
+        self._estimated_returns: Optional[EstimatedReturnsResource] = None
         self._historical_prices: Optional[HistoricalPricesResource] = None
         self._jobs: Optional[JobsResource] = None
         self._snapshots: Optional[SnapshotsResource] = None
         self._transactions: Optional[TransactionsResource] = None
         self._transaction_jobs: Optional[TransactionJobsResource] = None
+        self._underlying_assets: Optional[UnderlyingAssetsResource] = None
 
     @property
     def analysis(self) -> AnalysisResource:
@@ -97,6 +101,13 @@ class PortfolioNamespace:
         return self._constituent_attributes
 
     @property
+    def estimated_returns(self) -> EstimatedReturnsResource:
+        """Access estimated returns for entities."""
+        if self._estimated_returns is None:
+            self._estimated_returns = EstimatedReturnsResource(self._client)
+        return self._estimated_returns
+
+    @property
     def historical_prices(self) -> HistoricalPricesResource:
         """Access historical prices resource."""
         if self._historical_prices is None:
@@ -131,6 +142,13 @@ class PortfolioNamespace:
             self._transaction_jobs = TransactionJobsResource(self._client)
         return self._transaction_jobs
 
+    @property
+    def underlying_assets(self) -> UnderlyingAssetsResource:
+        """Access derivative underlying assets and dated spot values."""
+        if self._underlying_assets is None:
+            self._underlying_assets = UnderlyingAssetsResource(self._client)
+        return self._underlying_assets
+
 
 __all__ = [
     "PortfolioNamespace",
@@ -140,9 +158,11 @@ __all__ = [
     "BenchmarksResource",
     "CompositeSecuritiesResource",
     "ConstituentAttributesResource",
+    "EstimatedReturnsResource",
     "HistoricalPricesResource",
     "JobsResource",
     "SnapshotsResource",
     "TransactionsResource",
     "TransactionJobsResource",
+    "UnderlyingAssetsResource",
 ]
