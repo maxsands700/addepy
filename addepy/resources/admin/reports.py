@@ -1,6 +1,7 @@
 """Reports resource for the Addepar API."""
 import logging
-from typing import Any, Dict, Generator, List, Optional
+from pathlib import Path
+from typing import Any, Dict, Generator, List, Optional, Union
 
 from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
@@ -148,6 +149,7 @@ class ReportsResource(BaseResource):
         portal_publishing: Optional[str] = None,
         contact_notification: Optional[str] = None,
         label: Optional[List[int]] = None,
+        brand_id: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Run a report for the specified portfolios.
@@ -164,6 +166,7 @@ class ReportsResource(BaseResource):
             contact_notification: Optional notification preference - "NOTIFY",
                 "DO_NOT_NOTIFY", or "USE_CONTACT_PREFERENCE".
             label: Optional list of label IDs to attach to generated PDFs.
+            brand_id: Optional team ID whose brand determines the report palette.
 
         Returns:
             Job resource object containing the job ID for tracking.
@@ -194,6 +197,8 @@ class ReportsResource(BaseResource):
             attributes["contact_notification"] = contact_notification
         if label is not None:
             attributes["label"] = label
+        if brand_id is not None:
+            attributes["brand_id"] = brand_id
 
         payload = {
             "data": {
@@ -369,3 +374,7 @@ class ReportsResource(BaseResource):
         response = self._get(f"/generated_reports/{job_id}/zipped_file/download")
         logger.debug(f"Downloaded zipped file for job {job_id}")
         return response.content
+
+    def download_zipped_file_to(self, job_id: str, path: Union[str, Path], *, overwrite: bool = False) -> Path:
+        """Stream the report ZIP to disk; the caller chooses the destination."""
+        return self._client.download(f"/generated_reports/{job_id}/zipped_file/download", path, overwrite=overwrite)
