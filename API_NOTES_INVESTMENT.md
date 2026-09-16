@@ -43,3 +43,29 @@ returning `None` as if submission succeeded.
 Live validation should use read-only calls for these resources. Write contracts
 are exercised offline only, including null metric deletion and entity-wide delete
 routes. Production live tests must never execute those writes.
+
+## Legacy ownership and synchronous queries
+
+Representative offline contracts also cover the published
+[groups](https://developers.addepar.com/docs/groups),
+[group types](https://developers.addepar.com/docs/group-types),
+[positions](https://developers.addepar.com/docs/positions), and
+[external ID types](https://developers.addepar.com/docs/external-identifier-types)
+interfaces. Confirmed existing filter names, member/child-group relationship
+methods, bulk arrays, custom/null attribute preservation and response unwrapping.
+No ownership route changes were needed. This is representative coverage, not a
+claim that every existing method or firm-specific attribute has been verified.
+
+Both `portfolio.analysis.query_raw()` and `portfolio.transactions.query_raw()`
+now accept copied parameters, a `data.attributes` envelope, or JSON text. They
+preserve unknown fields and external-ID-only scopes and return complete response
+metadata. Existing argument helpers delegate to the same normalization without
+signature changes. See [Portfolio Query](https://developers.addepar.com/docs/portfolio-query)
+and [Transactions Query](https://developers.addepar.com/docs/transactions-query).
+
+The transaction-query guide lists `sortings` in its parameter table but uses
+`sorting` in its request example. The argument helper retains its existing
+`sorting` field; raw queries preserve whichever field the caller supplies.
+Sandbox confirmation is still needed to resolve that documentation conflict.
+Saved portfolio views retain their JSON-or-bytes return contract, while saved
+transaction views retain `requests.Response` for compatibility.

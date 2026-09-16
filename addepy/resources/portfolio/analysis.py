@@ -4,6 +4,7 @@ from typing import Any, Dict, List, Optional, Union
 
 from ...constants import OutputType, PortfolioType
 from ..base import BaseResource
+from ..query import QueryInput, query_parameters
 
 logger = logging.getLogger("addepy")
 
@@ -37,6 +38,7 @@ class AnalysisResource(BaseResource):
 
     Query Methods:
         - query() - Execute a dynamic portfolio query
+        - query_raw() - Execute copied query JSON without changing its fields
 
     Note:
         For large-scale queries, use the Jobs API (client.portfolio.jobs)
@@ -180,6 +182,16 @@ class AnalysisResource(BaseResource):
     # Query Methods
     # =========================================================================
 
+    def query_raw(self, query: QueryInput) -> Dict[str, Any]:
+        """Execute raw query parameters, a JSON:API envelope, or JSON text.
+
+        Preserves unknown fields, external-ID scopes, and nested values without
+        mutating the input. Returns the complete response including metadata.
+        Use portfolio.jobs for queries requiring asynchronous processing.
+        """
+        payload = {"data": {"type": "portfolio_query", "attributes": query_parameters(query)}}
+        return self._post("/portfolio/query", json=payload).json()
+
     def query(
         self,
         columns: List[Dict[str, Any]],
@@ -302,15 +314,7 @@ class AnalysisResource(BaseResource):
         if external_ids is not None:
             attributes["external_ids"] = external_ids
 
-        payload = {
-            "data": {
-                "type": "portfolio_query",
-                "attributes": attributes,
-            }
-        }
-
-        response = self._post("/portfolio/query", json=payload)
-        result = response.json()
+        result = self.query_raw(attributes)
 
         # Log with portfolio count info
         if isinstance(portfolio_id, list):
