@@ -2,6 +2,30 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.6.0] - 2026-09-16
+
+### Added
+- Raw dictionary/JSON-string queries for portfolio and transaction jobs, shared wait/resume/download helpers, and optional beta batched portfolio jobs.
+- Raw synchronous portfolio/transaction queries.
+- OAuth bearer/refresh support, explicit environment URLs, injected sessions, public raw requests, full-page iteration, and atomic streaming downloads.
+- Fees, fee schedules, payouts, report schedules, expanded billable portfolios, estimated returns, derivative underlying assets, benchmark proxy reads/deletes, and model-type changes.
+- Offline unit/contract suite with network blocking and CI; an explicit guarded live diagnostic command with JSON/Markdown reports.
+
+### Changed
+- pandas is optional; imports accept CSV text/bytes, Path, file objects, and DataFrames.
+- Read requests retry transient failures within configured limits; writes require explicit retry opt-in.
+- Polling uses immediate status checks and monotonic deadlines; pagination follows returned endpoint-specific coordinates.
+- HTTP exceptions retain status, structured errors and request IDs without copying bodies into their messages.
+
+### Fixed
+- Missing job status no longer signals success; documented failure states terminate polling.
+- Bulk transaction/benchmark methods preserve caller inputs.
+- Historical-price submissions reject missing async job IDs.
+- File uploads use the shared authenticated transport.
+- README method aliases and package version metadata are consistent.
+
+See MIGRATION.md, TESTING.md, and docs/API_COVERAGE.md for behavior changes and live-verification limits.
+
 ## [0.2.0] - 2025-12-12
 
 ### Added

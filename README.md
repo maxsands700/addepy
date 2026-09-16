@@ -1,359 +1,151 @@
 # AddePy
 
-Unofficial Python SDK for the Addepar API.
+Unofficial Python SDK for the [Addepar API](https://developers.addepar.com/docs/welcome). Python 3.10+.
 
-## Installation
-Create a `venv` for your Python project, and then install `addepy` with:
+AddePy provides resource wrappers, raw portfolio/transaction queries, resumable export jobs, pagination, and streaming downloads. Version 0.6 adds billing, payout, report schedule, estimated return, derivative underlying asset, and model-type operations. See the [API coverage and verification notes](docs/API_COVERAGE.md).
+
+**Install**
 
 ```bash
 pip install addepy
+# Optional pandas support:
+pip install 'addepy[dataframe]'
 ```
 
-## Setup
+For this checkout, including the test suite:
 
-Create a `.env` file in your project with your Addepar credentials:
-
+```bash
+python -m venv .venv
+# macOS/Linux:
+source .venv/bin/activate
+# Windows PowerShell: .venv\Scripts\Activate.ps1
+python -m pip install -e '.[dev]'
+python -m pytest
 ```
-ADDEPAR_FIRM_NAME=yourfirm
-ADDEPAR_FIRM_ID=12345
-ADDEPAR_API_KEY=your_base64_encoded_api_key
-```
 
-`ADDEPAR_FIRM_NAME` is your URL subdomain: `https://{ADDEPAR_FIRM_NAME}.addepar.com`
+The pytest suite runs entirely offline and blocks network connections. To verify a firm from your work computer, follow [TESTING.md](TESTING.md). No live Addepar compatibility is claimed from mocked tests alone.
 
-## Basic Usage
+**Configure a client**
+
+Copy [.env.example](.env.example) to a private `.env` and fill in your environment and credentials. The private `.env` file is ignored by Git.
 
 ```python
 from addepy import AddePy
 
-addepy = AddePy()  # Reads from .env automatically, or pass in config variables yourself
-
-# List entities - Tier 1 Method
-entity_types = addepy.ownership.entities.list_entity_types()
-
-# Execute a portfolio query (submit, poll, download) - Tier 2 Method
-results = addepy.portfolio.jobs.execute_portfolio_query(query_dict)
-
-# Run an import (submit, poll, download) - Tier 2 Method
-results = addepy.admin.import_tool.execute_import(df, "TRANSACTIONS")
+with AddePy() as client:  # Loads .env and ADDEPAR_* environment variables
+    entities = client.ownership.entities.list_entities(limit=10)
 ```
 
-_The Import Tool via API is in Beta (as of 12/10/2025), so you may need to request access for your firm. However, this is a great tool... the Import Tool allows data management of almost all resources in Addepar..._
+`ADDEPAR_API_KEY` is the existing **base64-encoded `key_id:key_secret` pair**, optionally prefixed with `Basic `. OAuth uses `ADDEPAR_ACCESS_TOKEN` instead. The detailed [authentication guide](https://developers.addepar.com/docs/basic-authentication) documents both mechanisms.
 
-## Design Philosophy
-
-### Repository Structure
-
-Mirrors the [Addepar API documentation](https://developers.addepar.com/docs/resource-overview):
-
-```
-addepy/
-├── client.py                  # Main entry point
-├── exceptions.py              # Custom exceptions
-├── constants.py               # SDK constants
-└── resources/
-    ├── base.py                # Base resource class
-    │
-    ├── portfolio/             # PORTFOLIO namespace
-    │   ├── analysis.py        # Views & queries
-    │   ├── arguments.py       # Attribute arguments
-    │   ├── attributes.py      # Attribute discovery
-    │   ├── benchmarks.py      # Benchmark management
-    │   ├── composite_securities.py  # ETF constituents
-    │   ├── constituent_attributes.py
-    │   ├── historical_prices.py
-    │   ├── jobs.py            # Async query jobs
-    │   ├── snapshots.py       # Point-in-time snapshots
-    │   ├── transactions.py    # Transaction management
-    │   └── transaction_jobs.py
-    │
-    ├── ownership/             # OWNERSHIP namespace
-    │   ├── entities.py        # Entities & entity types
-    │   ├── external_ids.py    # External system mappings
-    │   ├── groups.py          # Groups & group types
-    │   └── positions.py       # Ownership relationships
-    │
-    └── admin/                 # ADMIN namespace
-        ├── audit.py           # Audit trail queries
-        ├── billable_portfolios.py
-        ├── client_portal.py   # Portal publishing
-        ├── contacts.py        # Contact management
-        ├── files.py           # File management
-        ├── import_tool.py     # Bulk data imports
-        ├── reports.py         # Report generation
-        ├── roles.py           # Role definitions
-        ├── target_allocations.py
-        ├── teams.py           # Team management
-        ├── users.py           # User management
-        └── view_sets.py       # Client portal views
-```
-
-### Namespaces & Resources
-
-The SDK mirrors the Addepar API documentation structure with three namespaces:
-
-```
-addepy.portfolio    → Market data & holdings
-addepy.ownership    → Entity management
-addepy.admin        → System & user management
-```
-
-Each namespace contains resources that map to API endpoints:
+Explicit configuration is also supported:
 
 ```python
-addepy.portfolio.jobs           # /v1/jobs
-addepy.ownership.entities       # /v1/entities
-addepy.admin.import_tool        # /v1/imports
-```
-
-### Tier 1 vs Tier 2 Methods
-
-**Tier 1 - CRUD Operations**
-
-Direct wrappers around individual API endpoints.
-
-| Pattern    | Purpose                          |
-| ---------- | -------------------------------- |
-| `create_*` | Create a resource                |
-| `get_*`    | Retrieve a resource              |
-| `list_*`   | List resources (with pagination) |
-| `update_*` | Update a resource                |
-| `delete_*` | Delete a resource                |
-
-```python
-job_id = addepy.portfolio.jobs.create_job(query_dict)
-status = addepy.portfolio.jobs.get_job_status(job_id)
-results = addepy.portfolio.jobs.get_job_results(job_id)
-```
-
-**Tier 2 - Orchestration**
-
-Combine multiple Tier 1 operations into a single call.
-
-| Pattern     | Purpose                        |
-| ----------- | ------------------------------ |
-| `execute_*` | Submit → Poll → Return results |
-
-```python
-# Does create_job + poll for completion + get_job_results
-results = addepy.portfolio.jobs.execute_portfolio_query(query_dict)
-```
-
-Use Tier 1 when you need fine-grained control. Use Tier 2 for convenience.
-
-### Pagination: `list_*` vs `iter_*`
-
-Every paginated endpoint has two methods:
-
-| Method   | Returns     | Default limit | Use when...                              |
-| -------- | ----------- | ------------- | ---------------------------------------- |
-| `list_*` | `list`      | 10,000        | You need all results in memory at once   |
-| `iter_*` | `Generator` | No limit      | You want to process items one at a time  |
-
-**`list_*`** fetches pages behind the scenes and returns a plain list. It caps results at 10,000 by default to prevent runaway API calls, and logs a warning if the cap is hit.
-
-```python
-# Returns up to 10,000 entities as a list
-entities = addepy.ownership.entities.list_entities()
-
-# Override the default limit
-entities = addepy.ownership.entities.list_entities(limit=50_000)
-```
-
-**`iter_*`** returns a lazy generator that yields one item at a time, only fetching the next page when needed. This keeps memory usage constant regardless of result size and gives you full control over when to stop.
-
-```python
-# Process entities one at a time - memory-efficient for large datasets
-for entity in addepy.ownership.entities.iter_entities():
-    process(entity)
-
-# Stop early whenever you want
-for entity in addepy.ownership.entities.iter_entities():
-    if found_what_i_need(entity):
-        break
-
-# Cap results on the iterator too
-for entity in addepy.ownership.entities.iter_entities(limit=100):
-    process(entity)
-```
-
-Use `list_*` for small-to-medium datasets where you need random access or the full list. Use `iter_*` when working with large datasets or when you want to process results as they arrive.
-
-## Error Handling
-
-```python
-from addepy import AddePyError, AuthenticationError, RateLimitError, ValidationError
-
-try:
-    results = addepy.ownership.entities.create_entity(...)
-except ValidationError as e:
-    print(f"Invalid input: {e}")
-except RateLimitError as e:
-    print(f"Rate limited. Retry after {e.retry_after} seconds")
-except AddePyError as e:
-    print(f"API error: {e}")
-```
-
-## Logging
-
-```python
-import logging
-
-logging.getLogger("addepy").setLevel(logging.DEBUG)
-logging.getLogger("addepy").addHandler(logging.StreamHandler())
-```
-
-## Example Workflows
-
-Real-world automation examples for wealth management firms:
-
-### Bulk Imports
-
-```python
-import pandas as pd
-
-# Prepare transaction data
-attributes_df = pd.DataFrame({
-    "Entity ID": [11111111, 22222222, 33333333],
-    "Attribute Name": ["Portfolio Manager", "Trust Advisor", "Account Status"],
-    "Attribute Value": ["Michael Scott", "Dwight Schrute", "Closed"],
-})
-
-# Execute import with polling
-result = addepy.admin.import_tool.execute_import(
-    data=attributes_df,
-    import_type="ATTRIBUTES"
+client = AddePy(
+    firm_name="yourfirm",
+    firm_id="12345",
+    key_id="your-key-id",
+    key_secret="your-key-secret",
+    environment="sandbox",  # production, development, or sandbox
+    load_env=False,
 )
-
-print(f"Imported {result['success_count']} transactions")
 ```
 
-### Audit & Compliance Monitoring
+Use `base_url="https://yourfirm.sandbox.addepar.com/api/v1"` for an explicit API base. `load_env=False` skips reading `.env`; ordinary environment variables remain available as fallbacks. Explicit authentication overrides environment credentials. A custom `requests.Session` can be supplied as `session=`; the caller owns its lifecycle.
+
+**Run copied raw queries**
+
+Copy the query JSON from Addepar into a private file. Both job resources accept JSON strings or dictionaries, either direct query parameters or the exported `{"data": {"attributes": {...}}}` envelope. Query fields and values pass through unchanged; the SDK creates the job envelope and never modifies your input.
 
 ```python
+from pathlib import Path
 from addepy import AddePy
-from datetime import datetime, timedelta
 
-# 1. Query recent attribute changes on sensitive fields
-week_ago = (datetime.now() - timedelta(days=7)).strftime("%Y-%m-%d")
-changes = addepy.admin.audit.query_attribute_changes(
-    start_date=week_ago,
-    attribute_keys=["portfolio_manager"]
-)
+with AddePy() as client:
+    portfolio = Path("live-queries/portfolio.json").read_text(encoding="utf-8")
+    transactions = Path("live-queries/transactions.json").read_text(encoding="utf-8")
 
-# 2. Flag changes for compliance review
-flagged = flag_for_compliance(changes)  # Your custom logic
-
-# 3. Generate report and notify stakeholders
-send_compliance_report(flagged)  # Your email/Slack integration
+    portfolio_result = client.portfolio.jobs.execute_job(portfolio).json()
+    transaction_result = client.portfolio.transaction_jobs.execute_job(transactions).json()
 ```
 
-### Prospecting & Client Onboarding Workflows
+Argument helpers (`create_query_job`, `create_view_job`) remain available. `execute_portfolio_query` and `execute_portfolio_query_job` are aliases for portfolio `execute_job`. Transaction `execute_query_job` remains the argument helper; transaction `execute_job` accepts a raw query.
+
+For long-running jobs, keep the ID and download to a file:
 
 ```python
-# Create new client entity
-client = addepy.ownership.entities.create_entity(
-    entity_type_id="client",
-    name="Smith Family Trust",
-    attributes={"inception_date": "2024-01-15"}
-)
+with AddePy() as client:
+    query = Path("live-queries/portfolio.json").read_text(encoding="utf-8")
+    job_id = client.portfolio.jobs.create_job(query)
+    client.portfolio.jobs.wait_for_job(job_id, timeout=1200)
+    client.portfolio.jobs.download_job_results(job_id, "portfolio.json")
 
-# Create associated accounts
-account = addepy.ownership.entities.create_entity(
-    entity_type_id="account",
-    name="Smith Brokerage Account",
-    attributes={"account_number": "ABC-123456"}
-)
-
-# Link account to client via position
-addepy.ownership.positions.create_position(
-    owner_id=client["id"],
-    owned_id=account["id"],
-    inception_date="2024-01-15"
-)
-
-# Map to CRM system
-addepy.ownership.external_ids.create_external_id_type(
-    external_type_key="salesforce",
-    display_name="Salesforce"
-)
+# After a local timeout or process restart, reuse the saved ID:
+with AddePy() as client:
+    response = client.portfolio.jobs.resume_job(job_id)
 ```
 
-### Rebalancing Analysis, Integrations w/ Trading Systems
+The same methods exist on `transaction_jobs`. Local timeouts leave server jobs running. `JobError` carries `job_id`, `status`, `errors`, and `job_data`; `AddePyTimeoutError` carries `job_id` and `last_status`. Downloads stream to an atomic file and preserve existing files. Addepar [job results expire after 24 hours](https://developers.addepar.com/docs/jobs).
+
+Portfolio jobs also accept `batch=True`, an explicit opt-in to [Addepar's beta batched computation](https://developers.addepar.com/docs/batched-jobs). Attribute and view restrictions apply; see [API notes](docs/API_COVERAGE.md) for the documented job-type ambiguity.
+
+**Navigate resources and results**
+
+| Namespace | Examples |
+| --- | --- |
+| `client.portfolio` | `analysis`, `jobs`, `transaction_jobs`, `transactions`, `snapshots`, `benchmarks`, `historical_prices`, `estimated_returns`, `underlying_assets` |
+| `client.ownership` | `entities`, `groups`, `positions`, `external_ids` |
+| `client.admin` | `users`, `roles`, `teams`, `contacts`, `files`, `reports`, `report_schedules`, `import_tool`, `fees`, `fee_schedules`, `billable_portfolios`, `payout_recipients`, `payout_rules` |
+
+Most singular resource methods return a resource dictionary; list methods return lists. Job downloads return `requests.Response`, and streamed download helpers return `Path`. Method docstrings describe endpoint-specific exceptions to these conventions.
 
 ```python
-# Get target allocations for a portfolio
-allocations = addepy.admin.target_allocations.list_allocation_models()
+for entity in client.ownership.entities.iter_entities():
+    process(entity)
 
-# Compare current vs target
-current_holdings = addepy.portfolio.analysis.query(
-    columns=[{"key": "value"}, {"key": "weight"}],
-    groupings=[{"key": "asset_class"}],
-    portfolio_type="ENTITY",
-    portfolio_id=12345,
-    start_date="2024-12-01",
-    end_date="2024-12-31"
-)
+# Preserve included resources, links, and metadata:
+for page in client.iter_pages("/entities", page_limit=100):
+    process_page(page)
 
-# Calculate drift from targets
-for holding in current_holdings["data"]["attributes"]["total"]["children"]:
-    asset_class = holding["name"]
-    current_weight = holding["columns"]["weight"]
-    # Compare to target and flag if drift > threshold
+# Raw endpoint access for new fields or APIs:
+response = client.request("GET", "/entities", params={"page[limit]": 1})
 ```
 
-### Integration with External Systems (CRM, Custodians, Trading, etc.)
+`list_*` methods generally cap results at 10,000; `iter_*` methods can traverse all pages lazily. Prefer explicit limits for exploratory calls.
+
+**Import CSV or a DataFrame**
 
 ```python
-# Sync Salesforce contacts with Addepar entities
-salesforce_contacts = get_salesforce_contacts()  # Your CRM API
+from pathlib import Path
 
-for contact in salesforce_contacts:
-    # Find matching Addepar entity by external ID
-    entities = addepy.ownership.entities.list_entities(
-        external_id_type="salesforce",
-        external_id=contact["sf_id"]
-    )
-
-    if entities:
-        # Update existing entity
-        addepy.ownership.entities.update_entity(
-            entity_id=entities[0]["id"],
-            attributes={"email": contact["email"], "phone": contact["phone"]}
-        )
-    else:
-        # Create new entity with external ID mapping
-        addepy.ownership.entities.create_entity(
-            entity_type_id="contact",
-            name=contact["name"],
-            external_ids=[{
-                "external_type_key": "salesforce",
-                "external_id": contact["sf_id"]
-            }]
-        )
+result = client.admin.import_tool.execute_import(
+    Path("attributes.csv"), "ATTRIBUTES", is_dry_run=True,
+)
+print(result["digests"], result["warnings"], result["errors"])
 ```
 
-### Team Access Management
+Imports accept CSV text, bytes, a `Path`, a readable file, or a pandas DataFrame. A string means CSV contents, so use `Path` for filenames. Dry runs and warning review are the defaults; committing an import requires `is_dry_run=False`. Import operations are excluded from the live verification suite.
+
+**OAuth refresh and request policy**
 
 ```python
-# Create a new team for junior analysts
-team = addepy.admin.teams.create_team(
-    name="Junior Analysts",
-    description="Read-only access to client portfolios"
-)
+from addepy import AddePy, OAuthTokenProvider
 
-# Get the appropriate role
-roles = addepy.admin.roles.list_roles()
-analyst_role = next(r for r in roles if r["attributes"]["name"] == "Analyst")
-
-# Add users to the team
-users = addepy.admin.users.list_users()
-junior_users = [u for u in users if "junior" in u["attributes"]["email"].lower()]
-
-for user in junior_users:
-    addepy.admin.teams.add_team_member(
-        team_id=team["id"],
-        user_id=user["id"],
-        role_id=analyst_role["id"]
-    )
+with OAuthTokenProvider(
+    token_url="https://api.addepar.com/public/oauth2/token",
+    client_id="your-client-id",
+    client_secret="your-client-secret",
+    refresh_token="your-refresh-token",
+    on_token_update=save_tokens_to_your_secret_store,
+) as tokens:
+    with AddePy(firm_name="yourfirm", firm_id="12345", token_provider=tokens) as client:
+        entities = client.ownership.entities.list_entities(limit=10)
 ```
+
+Register and authorize the OAuth application separately. The provider uses returned `expires_in` values and can persist rotated refresh tokens through the callback. Use the appropriate [OAuth token URL for your environment](https://developers.addepar.com/docs/oauth).
+
+Requests use connection/read timeouts and up to two retries for transient **read** failures. Writes are not retried automatically. Addepar's retry delay is respected; delays beyond `max_retry_wait` raise the original error instead of retrying early. `max_retries=0` disables retries. `retry=True` on a raw write is an explicit caller decision and cannot replay streaming bodies.
+
+Polling deadlines also constrain built-in OAuth refresh, request timeouts, and retry sleeps. Arbitrary token-provider callbacks manage their own blocking behavior; streaming read timeouts are inactivity limits, not a total transfer deadline. Cross-host download redirects do not carry API credentials, firm headers, cookies, or client certificates.
+
+Exceptions retain `status_code`, `request_id`, `errors`, and `response` where available. Exception messages omit raw response bodies. See [MIGRATION.md](MIGRATION.md) for behavior changes and [TESTING.md](TESTING.md) for verification.
