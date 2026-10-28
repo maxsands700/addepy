@@ -311,28 +311,28 @@ class BenchmarksResource(BaseResource):
     def iter_benchmark_proxies(
         self,
         *,
-        entity_ids: Optional[Sequence[Union[str, int]]] = None,
+        entity_ids: Sequence[Union[str, int]],
         limit: Optional[int] = None,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> Generator[Dict[str, Any], None, None]:
-        """Iterate benchmark proxy assignments, optionally filtered by entity."""
-        params: Dict[str, Any] = {}
-        if entity_ids is not None:
-            if isinstance(entity_ids, (str, bytes)) or not entity_ids:
-                raise ValueError("entity_ids must be a nonempty sequence of entity IDs")
-            params["filter[entity_id]"] = ",".join(str(value) for value in entity_ids)
+        """Iterate proxy assignments for entities; the entity filter is required."""
+        if isinstance(entity_ids, (str, bytes)) or not entity_ids:
+            raise ValueError("entity_ids must be a nonempty sequence of entity IDs")
         return self._paginate(
-            "/benchmark_proxies", params=params, page_limit=page_limit, max_items=limit
+            "/benchmark_proxies",
+            params={"filter[entity_id]": ",".join(str(value) for value in entity_ids)},
+            page_limit=page_limit,
+            max_items=limit,
         )
 
     def list_benchmark_proxies(
         self,
         *,
-        entity_ids: Optional[Sequence[Union[str, int]]] = None,
+        entity_ids: Sequence[Union[str, int]],
         limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
-        """List proxy assignments, preserving server-provided attributes."""
+        """List proxy assignments for the required entities, up to ``limit`` records."""
         return list(self.iter_benchmark_proxies(
             entity_ids=entity_ids, limit=limit, page_limit=page_limit,
         ))

@@ -52,7 +52,7 @@ Useful options:
 | Option | Purpose |
 | --- | --- |
 | `--list-checks` | List available checks without making requests. |
-| `--extended --entity-id YOUR_ENTITY_ID` | Include additional read endpoints; estimated returns need the entity filter. |
+| `--extended --entity-id YOUR_ENTITY_ID` | Include additional read endpoints; benchmark proxies and estimated returns need the entity filter. |
 | `--only entities,report_schedules` | Select checks by name. |
 | `--job-timeout 1200` | Polling deadline per job; default is 120 seconds. |
 | `--poll-interval 5` | Seconds between polls; default is 5. |

@@ -1,10 +1,31 @@
-# Migrating to AddePy 0.6
+# Migrating to AddePy 1.0
 
-This is a self-contained migration guide for applications using AddePy 0.2–0.5.
+This is a self-contained migration guide for applications using AddePy 0.2–0.6.
 Give the entire file to an LLM together with your application repository. Most
-resource calls remain compatible; the required change is choosing an explicit
-configuration source. Preserve existing business behavior while applying the
-changes below.
+resource calls remain compatible. Applications upgrading from 0.2–0.5 must choose
+an explicit configuration source. Preserve existing business behavior while
+applying the changes below.
+
+## Upgrading from 0.6
+
+Version 1.0.0 is the first stable release. The configuration and query APIs from
+0.6 remain unchanged. Update your dependency to `addepy>=1.0,<2` (or
+`addepy[dataframe]>=1.0,<2` when using DataFrames).
+
+Pass a nonempty `entity_ids` sequence to both `list_benchmark_proxies()` and
+`iter_benchmark_proxies()`. Calls without IDs previously reached Addepar without
+its required filter and failed with HTTP 400; they now fail locally. For example:
+
+```python
+proxies = client.portfolio.benchmarks.list_benchmark_proxies(entity_ids=[12345])
+```
+
+The benchmark-proxy diagnostic also requires `--entity-id`. Audit pagination and
+Import Tool response headers are corrected without changing their public method
+signatures. Replace private pagination or header workarounds with the SDK methods.
+
+The remaining sections describe changes introduced in 0.6 for applications
+upgrading from earlier releases.
 
 ## Instructions for a migration agent
 
@@ -32,14 +53,14 @@ changes below.
 ## Dependencies
 
 Use Python 3.10+ and update the existing dependency declaration and lockfile to
-AddePy 0.6. For example:
+AddePy 1.0. For example:
 
 ```bash
-python -m pip install 'addepy>=0.6,<0.7'
+python -m pip install 'addepy>=1.0,<2'
 ```
 
 pandas is no longer installed by the core SDK. Applications that use DataFrames
-must retain their own pandas dependency or use `addepy[dataframe]>=0.6,<0.7`.
+must retain their own pandas dependency or use `addepy[dataframe]>=1.0,<2`.
 `requests` and `python-dotenv` remain core dependencies.
 
 ## Select the configuration source explicitly

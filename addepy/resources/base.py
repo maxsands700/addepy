@@ -159,6 +159,25 @@ class BaseResource:
         ``cursor_parameter`` controls metadata-only cursors (e.g. billable
         portfolios); links retain their exact documented cursor spelling.
         """
+        yield from self._iter_pages(
+            endpoint,
+            params=params,
+            page_limit=page_limit,
+            max_pages=max_pages,
+            cursor_parameter=cursor_parameter,
+        )
+
+    def _iter_pages(
+        self,
+        endpoint: str,
+        *,
+        params: Optional[Dict[str, Any]] = None,
+        page_limit: Optional[int] = None,
+        max_pages: Optional[int] = None,
+        cursor_parameter: str = "page[cursor]",
+        initial_response: Optional[requests.Response] = None,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """Share pagination with queries whose first page comes from a POST."""
         if page_limit is not None and page_limit <= 0:
             raise ValueError("page_limit must be positive")
         if max_pages is not None and max_pages < 0:
@@ -178,7 +197,11 @@ class BaseResource:
             if fingerprint in seen:
                 raise ProtocolError("Pagination returned a repeated next page")
             seen.add(fingerprint)
-            response = self._get(current_endpoint, params=request_params)
+            response = (
+                initial_response
+                if pages == 0 and initial_response is not None
+                else self._get(current_endpoint, params=request_params)
+            )
             try:
                 document = response.json()
             except ValueError as exc:

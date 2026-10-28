@@ -70,7 +70,10 @@ READ_CHECKS = {
     "attributes": Check("/attributes", "portfolio.attributes.list_attributes", list),
     "benchmarks": Check("/benchmarks", "portfolio.benchmarks.list_benchmarks", list),
     "benchmark_proxies": Check(
-        "/benchmark_proxies", "portfolio.benchmarks.list_benchmark_proxies", list
+        "/benchmark_proxies",
+        "portfolio.benchmarks.list_benchmark_proxies",
+        list,
+        requires_entity=True,
     ),
     "estimated_returns": Check(
         "/estimated_returns",
@@ -584,7 +587,7 @@ def run_diagnostics(
                 if check.requires_entity and not args.entity_id:
                     result.status, result.detail = (
                         "missing_input",
-                        "Supply --entity-id to check estimated returns; no unfiltered request was sent.",
+                        "Supply --entity-id for this check; no unfiltered request was sent.",
                     )
                     continue
                 result.http_status = _check_read(
@@ -824,7 +827,8 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print check names and exit without credentials or network",
     )
     parser.add_argument(
-        "--entity-id", help="Entity filter for estimated_returns; excluded from reports"
+        "--entity-id",
+        help="Entity filter for benchmark_proxies and estimated_returns; excluded from reports",
     )
     for name in ("portfolio", "transaction"):
         group = parser.add_mutually_exclusive_group()

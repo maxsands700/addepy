@@ -2,6 +2,9 @@
 
 Unofficial Python SDK for Addepar. Python 3.10+.
 
+Version 1.0.0 is the first stable release. See the [migration guide](MIGRATION.md)
+when upgrading from a pre-1.0 version.
+
 ## Install
 
 ```bash

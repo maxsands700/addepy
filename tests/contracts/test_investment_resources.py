@@ -218,6 +218,23 @@ def test_deletes_do_not_parse_empty_204_body(resource_class, method, arg, path):
     assert client.calls[0][:2] == ("DELETE", path)
 
 
+@pytest.mark.parametrize("method", ["iter_benchmark_proxies", "list_benchmark_proxies"])
+def test_benchmark_proxies_require_entity_filter_before_request(method):
+    client = FakeClient()
+    with pytest.raises(TypeError, match="entity_ids"):
+        getattr(BenchmarksResource(client), method)()
+    assert not client.calls
+
+
+@pytest.mark.parametrize("method", ["iter_benchmark_proxies", "list_benchmark_proxies"])
+@pytest.mark.parametrize("entity_ids", [None, [], "116", b"116"])
+def test_benchmark_proxies_reject_empty_or_ambiguous_filter(method, entity_ids):
+    client = FakeClient()
+    with pytest.raises(ValueError, match="entity_ids"):
+        getattr(BenchmarksResource(client), method)(entity_ids=entity_ids)
+    assert not client.calls
+
+
 def test_benchmark_proxy_list_follows_reference_cursor():
     client = FakeClient(
         {
@@ -226,12 +243,13 @@ def test_benchmark_proxy_list_follows_reference_cursor():
         },
         {"data": [], "links": {"next": None}},
     )
-    assert BenchmarksResource(client).list_benchmark_proxies(entity_ids=[116]) == [
-        PROXY
-    ]
+    assert BenchmarksResource(client).list_benchmark_proxies(
+        entity_ids=[116, "117"]
+    ) == [PROXY]
     assert len(client.calls) == 2
     assert client.calls[1][2]["params"]["page[cursor]"] == "next-proxy"
-    assert client.calls[0][2]["params"]["filter[entity_id]"] == "116"
+    assert client.calls[0][2]["params"]["filter[entity_id]"] == "116,117"
+    assert client.calls[1][2]["params"]["filter[entity_id]"] == "116,117"
 
 
 def test_bulk_benchmark_updates_do_not_pop_callers_ids():

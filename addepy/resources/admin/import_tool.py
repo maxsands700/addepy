@@ -106,8 +106,8 @@ class ImportToolResource(BaseResource):
         if not isinstance(csv_payload, str) or not csv_payload.strip():
             raise ValueError("Import CSV cannot be empty")
 
-        # Override Content-Type for CSV payload
-        headers = {"Content-Type": "text/plain"}
+        # Imports accept CSV payloads and return ordinary JSON, not JSON:API media.
+        headers = {"Content-Type": "text/plain", "Accept": "application/json"}
 
         # Make request
         response = self._client._request(
@@ -152,7 +152,9 @@ class ImportToolResource(BaseResource):
             - 'VALIDATION_FAILED': Validation failed due to unknown error
             - 'IMPORT_FAILED': Import failed due to unknown error
         """
-        response = self._get(f"/imports/{import_id}")
+        response = self._get(
+            f"/imports/{import_id}", headers={"Accept": "application/json"}
+        )
         data = response.json()
         status = (
             data.get("data", {}).get("attributes", {}).get("status", "UNKNOWN_STATUS")
@@ -174,7 +176,9 @@ class ImportToolResource(BaseResource):
             - 'errors': List of error objects with 'message', 'type', 'affected_members'
         """
         logger.debug(f"Fetching results for import {import_id}")
-        response = self._get(f"/import_results/{import_id}")
+        response = self._get(
+            f"/import_results/{import_id}", headers={"Accept": "application/json"}
+        )
         data = response.json()
         attributes = data.get("data", {}).get("attributes", {})
 

@@ -664,11 +664,15 @@ def test_extended_suite_uses_wrappers_and_skips_required_entity_input(
     )
     assert code == 2
     assert report["summary"] == {
-        "pass": len(diagnostics.READ_CHECKS) - 1,
-        "missing_input": 1,
+        "pass": len(diagnostics.READ_CHECKS) - 2,
+        "missing_input": 2,
     }
-    assert len(adapter.requests) == len(diagnostics.READ_CHECKS) - 1
-    assert not any("estimated_returns" in request.url for request in adapter.requests)
+    assert len(adapter.requests) == len(diagnostics.READ_CHECKS) - 2
+    assert not any(
+        endpoint in request.url
+        for endpoint in ("benchmark_proxies", "estimated_returns")
+        for request in adapter.requests
+    )
     payouts = [
         request for request in adapter.requests if "/billing/payout/" in request.url
     ]
@@ -678,8 +682,22 @@ def test_extended_suite_uses_wrappers_and_skips_required_entity_input(
     )
 
 
-def test_estimated_returns_uses_required_entity_filter_without_reporting_it(
-    monkeypatch, tmp_path, env_file
+@pytest.mark.parametrize("check_name", ["benchmark_proxies", "estimated_returns"])
+def test_required_entity_check_sends_no_request_without_input(
+    monkeypatch, tmp_path, env_file, check_name
+):
+    code, report, _, adapter = run_cli(
+        monkeypatch, tmp_path, env_file, [], "--only", check_name
+    )
+    assert code == 2
+    assert report["checks"][0]["status"] == "missing_input"
+    assert "--entity-id" in report["checks"][0]["detail"]
+    assert adapter.requests == []
+
+
+@pytest.mark.parametrize("check_name", ["benchmark_proxies", "estimated_returns"])
+def test_required_entity_filter_used_without_reporting_it(
+    monkeypatch, tmp_path, env_file, check_name
 ):
     code, report, markdown, adapter = run_cli(
         monkeypatch,
@@ -687,7 +705,7 @@ def test_estimated_returns_uses_required_entity_filter_without_reporting_it(
         env_file,
         [(200, {"data": []})],
         "--only",
-        "estimated_returns",
+        check_name,
         "--entity-id",
         PRIVATE_VALUE,
     )

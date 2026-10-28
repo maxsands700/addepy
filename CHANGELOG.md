@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.0.0] - 2026-10-28
+
+First stable release of AddePy.
+
+### Fixed
+- All four audit query methods now follow pagination through the shared authenticated transport, retaining timeout, retry, and SDK error handling. Shared pagination handles absolute, API-prefixed, and dictionary links and detects repeated pages.
+- Import creation (including deletion imports), status, and results requests now send `Accept: application/json`, matching the Import Tool endpoints. CSV request bodies retain `Content-Type: text/plain`.
+- Benchmark proxy listing and iteration require a nonempty `entity_ids` sequence, matching Addepar's required filter. The benchmark-proxy diagnostic now uses `--entity-id` and reports missing input when it is absent.
+
+### Changed
+- Package metadata now identifies AddePy as Production/Stable.
+- The migration guide covers upgrades from 0.6 and earlier releases to 1.0.
+
 ## [0.6.0] - 2026-09-16
 
 ### Added

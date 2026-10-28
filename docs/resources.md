@@ -149,8 +149,10 @@ Underlying assets use `/derivatives/underlying_assets` with resource type
 omitted metrics; a `None` metric value deletes that date's spot value.
 
 Benchmark proxy methods live under `client.portfolio.benchmarks` and support
-reads and deletes. Proxy IDs also combine entity and date. For operations without
-a dedicated wrapper, use `client.request()` with your API payload.
+reads and deletes. Listing and iteration require a nonempty `entity_ids`
+sequence, for example `list_benchmark_proxies(entity_ids=[12345])`. Proxy IDs also
+combine entity and date. For operations without a dedicated wrapper, use
+`client.request()` with your API payload.
 `delete_entity_estimated_returns()` and `delete_entity_benchmark_proxies()` remove
 all records of that kind for an entity.
 

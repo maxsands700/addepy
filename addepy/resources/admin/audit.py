@@ -1,4 +1,5 @@
 """Audit resource for the Addepar API."""
+
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -87,23 +88,10 @@ class AuditResource(BaseResource):
         # Initial POST request
         params = {"page[limit]": page_limit}
         response = self._post("/audit_trail", json=payload, params=params)
-        data = response.json()
-
-        results = data.get("data", [])
-        next_link = data.get("links", {}).get("next")
-
-        # Follow pagination links (subsequent requests are GET)
-        while next_link:
-            response = self._client._session.get(
-                f"{self._client._base_url}{next_link}",
-                headers=self._client._headers,
-            )
-            response.raise_for_status()
-            data = response.json()
-            results.extend(data.get("data", []))
-            next_link = data.get("links", {}).get("next")
-
-        return results
+        pages = self._iter_pages(
+            "/audit_trail", params=params, initial_response=response
+        )
+        return list(self._items(pages, max_items=None))
 
     # =========================================================================
     # Public Methods

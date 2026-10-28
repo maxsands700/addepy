@@ -132,6 +132,97 @@ def test_invalid_import_input_never_sends(data):
     client._request.assert_not_called()
 
 
+@pytest.mark.parametrize(
+    "import_type,method", [("ATTRIBUTES", "POST"), ("DELETE_TRANSACTIONS", "DELETE")]
+)
+def test_import_creation_requests_json_and_sends_plain_text(import_type, method):
+    session = Mock(spec=requests.Session)
+    session.request.return_value = response({"data": {"id": "job"}})
+    client = AddePy("example", "1", access_token="token", session=session)
+
+    assert client.admin.import_tool.create_import("a,b\n1,2\n", import_type) == "job"
+
+    call = session.request.call_args
+    assert call.args == (method, "https://example.addepar.com/api/v1/imports")
+    assert call.kwargs["headers"]["Accept"] == "application/json"
+    assert call.kwargs["headers"]["Content-Type"] == "text/plain"
+    assert call.kwargs["headers"]["Authorization"] == "Bearer token"
+    assert call.kwargs["headers"]["Addepar-Firm"] == "1"
+    assert call.kwargs["data"] == "a,b\n1,2\n"
+    assert call.kwargs["params"] == {
+        "import_type": import_type,
+        "is_dry_run": "true",
+        "ignore_warnings": "false",
+    }
+
+
+@pytest.mark.parametrize(
+    "method,endpoint,attributes,expected",
+    [
+        (
+            "get_import_status",
+            "/imports/job",
+            {"status": "DRY_RUN_SUCCESSFUL"},
+            "DRY_RUN_SUCCESSFUL",
+        ),
+        (
+            "get_import_results",
+            "/import_results/job",
+            {"digests": ["1 attribute will be created"]},
+            {
+                "digests": ["1 attribute will be created"],
+                "warnings": [],
+                "errors": [],
+            },
+        ),
+    ],
+)
+def test_import_reads_request_json(method, endpoint, attributes, expected):
+    session = Mock(spec=requests.Session)
+    session.request.return_value = response(
+        {"data": {"id": "job", "attributes": attributes}}
+    )
+    client = AddePy("example", "1", access_token="token", session=session)
+
+    assert getattr(client.admin.import_tool, method)("job") == expected
+
+    call = session.request.call_args
+    assert call.args == ("GET", "https://example.addepar.com/api/v1" + endpoint)
+    assert call.kwargs["headers"]["Accept"] == "application/json"
+    assert call.kwargs["headers"]["Authorization"] == "Bearer token"
+
+
+def test_execute_import_preserves_json_accept_through_polling_without_changing_defaults(
+    monkeypatch,
+):
+    monkeypatch.setattr("addepy.resources.base.time.sleep", lambda _: None)
+    session = Mock(spec=requests.Session)
+    results = {"digests": ["1 attribute will be created"], "warnings": [], "errors": []}
+    session.request.side_effect = [
+        response({"data": {"id": "job"}}),
+        response({"data": {"attributes": {"status": "VALIDATING"}}}),
+        response({"data": {"attributes": {"status": "DRY_RUN_SUCCESSFUL"}}}),
+        response({"data": {"attributes": results}}),
+        response({"data": []}),
+    ]
+    client = AddePy("example", "1", access_token="token", session=session)
+
+    assert client.admin.import_tool.execute_import("a,b\n1,2\n", "ATTRIBUTES") == results
+    assert client.ownership.entities.list_entities(limit=1) == []
+
+    calls = session.request.call_args_list
+    assert [call.args for call in calls] == [
+        ("POST", "https://example.addepar.com/api/v1/imports"),
+        ("GET", "https://example.addepar.com/api/v1/imports/job"),
+        ("GET", "https://example.addepar.com/api/v1/imports/job"),
+        ("GET", "https://example.addepar.com/api/v1/import_results/job"),
+        ("GET", "https://example.addepar.com/api/v1/entities"),
+    ]
+    assert all(call.kwargs["headers"]["Accept"] == "application/json" for call in calls[:4])
+    assert calls[4].kwargs["headers"]["Accept"] == "application/vnd.api+json"
+    assert calls[4].kwargs["headers"]["Content-Type"] == "application/vnd.api+json"
+
+
 def test_oauth_refresh_inherits_client_deadline(monkeypatch):
     monkeypatch.setattr("addepy.auth.time.monotonic", lambda: 100)
     refresh_session = Mock(spec=requests.Session)
