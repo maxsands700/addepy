@@ -5,8 +5,6 @@ if TYPE_CHECKING:
     from ...client import AddeparClient
 
 from .audit import AuditResource
-from .billable_portfolios import BillablePortfoliosResource
-from .billing import FeesResource, FeeSchedulesResource
 from .client_portal import ClientPortalResource
 from .contacts import ContactsResource
 from .files import FilesResource
@@ -14,7 +12,6 @@ from .import_tool import ImportToolResource
 from .target_allocations import TargetAllocationsResource
 from .reports import ReportsResource
 from .report_schedules import ReportSchedulesResource
-from .payouts import PayoutRecipientsResource, PayoutRulesResource
 from .roles import RolesResource
 from .teams import TeamsResource
 from .users import UsersResource
@@ -28,7 +25,6 @@ class AdminNamespace:
     Usage:
         client.admin.audit.query_login_attempts(...)
         client.admin.audit.query_attribute_changes(...)
-        client.admin.billable_portfolios.create_billable_portfolio(...)
         client.admin.client_portal.publish_files(...)
         client.admin.contacts.get_contact(...)
         client.admin.contacts.list_contacts()
@@ -53,11 +49,6 @@ class AdminNamespace:
     def __init__(self, client: "AddeparClient") -> None:
         self._client = client
         self._audit: Optional[AuditResource] = None
-        self._billable_portfolios: Optional[BillablePortfoliosResource] = None
-        self._fees: Optional[FeesResource] = None
-        self._fee_schedules: Optional[FeeSchedulesResource] = None
-        self._payout_recipients: Optional[PayoutRecipientsResource] = None
-        self._payout_rules: Optional[PayoutRulesResource] = None
         self._report_schedules: Optional[ReportSchedulesResource] = None
         self._client_portal: Optional[ClientPortalResource] = None
         self._contacts: Optional[ContactsResource] = None
@@ -69,32 +60,6 @@ class AdminNamespace:
         self._teams: Optional[TeamsResource] = None
         self._users: Optional[UsersResource] = None
         self._view_sets: Optional[ViewSetsResource] = None
-
-    @property
-    def fees(self) -> FeesResource:
-        """Manage fee definitions, using full replacement for updates."""
-        if self._fees is None:
-            self._fees = FeesResource(self._client)
-        return self._fees
-
-    @property
-    def fee_schedules(self) -> FeeSchedulesResource:
-        """Manage fee schedules and fee associations."""
-        if self._fee_schedules is None:
-            self._fee_schedules = FeeSchedulesResource(self._client)
-        return self._fee_schedules
-
-    @property
-    def payout_recipients(self) -> PayoutRecipientsResource:
-        if self._payout_recipients is None:
-            self._payout_recipients = PayoutRecipientsResource(self._client)
-        return self._payout_recipients
-
-    @property
-    def payout_rules(self) -> PayoutRulesResource:
-        if self._payout_rules is None:
-            self._payout_rules = PayoutRulesResource(self._client)
-        return self._payout_rules
 
     @property
     def report_schedules(self) -> ReportSchedulesResource:
@@ -109,13 +74,6 @@ class AdminNamespace:
         if self._audit is None:
             self._audit = AuditResource(self._client)
         return self._audit
-
-    @property
-    def billable_portfolios(self) -> BillablePortfoliosResource:
-        """Access billable portfolios resource."""
-        if self._billable_portfolios is None:
-            self._billable_portfolios = BillablePortfoliosResource(self._client)
-        return self._billable_portfolios
 
     @property
     def client_portal(self) -> ClientPortalResource:
@@ -191,11 +149,6 @@ class AdminNamespace:
 __all__ = [
     "AdminNamespace",
     "AuditResource",
-    "BillablePortfoliosResource",
-    "FeesResource",
-    "FeeSchedulesResource",
-    "PayoutRecipientsResource",
-    "PayoutRulesResource",
     "ReportSchedulesResource",
     "ClientPortalResource",
     "ContactsResource",

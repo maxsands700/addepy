@@ -1,10 +1,11 @@
 """Billable Portfolios resource for the Addepar API."""
+
 import logging
 from typing import Any, Dict, Generator, List, Mapping, Optional, Sequence
 
 from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
-from .billing import _bulk_data, _resource
+from .fees import _bulk_data, _resource
 
 logger = logging.getLogger("addepy")
 
@@ -130,17 +131,26 @@ class BillablePortfoliosResource(BaseResource):
         return self._get(f"/billable_portfolios/{portfolio_id}").json()["data"]
 
     def iter_billable_portfolios(
-        self, *, limit: Optional[int] = None, page_limit: int = DEFAULT_PAGE_LIMIT,
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> Generator[Dict[str, Any], None, None]:
-        return self._paginate("/billable_portfolios", page_limit=page_limit, max_items=limit)
+        return self._paginate(
+            "/billable_portfolios", page_limit=page_limit, max_items=limit
+        )
 
     def list_billable_portfolios(
-        self, *, limit: int = DEFAULT_LIST_LIMIT, page_limit: int = DEFAULT_PAGE_LIMIT,
+        self,
+        *,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
         return list(self.iter_billable_portfolios(limit=limit, page_limit=page_limit))
 
     def create_billable_portfolios(
-        self, portfolios: Sequence[Mapping[str, Any]],
+        self,
+        portfolios: Sequence[Mapping[str, Any]],
     ) -> List[Dict[str, Any]]:
         """Create from attribute mappings containing schedule_id and entity_id or group_id."""
         resources = []
@@ -148,25 +158,46 @@ class BillablePortfoliosResource(BaseResource):
             if bool(attributes.get("entity_id")) == bool(attributes.get("group_id")):
                 raise ValueError("Each portfolio requires either entity_id or group_id")
             resources.append(_resource("create_billable_portfolio", attributes))
-        return self._post("/billable_portfolios", json={"data": _bulk_data(
-            resources, "create_billable_portfolio")}).json()["data"]
+        return self._post(
+            "/billable_portfolios",
+            json={"data": _bulk_data(resources, "create_billable_portfolio")},
+        ).json()["data"]
 
     def update_fee_schedules(self, schedules: Mapping[str, str]) -> None:
         """Assign fee schedules using {billable_portfolio_id: schedule_id}, up to 500."""
-        resources = [_resource("create_billable_portfolio", {"schedule_id": schedule_id}, portfolio_id)
-                     for portfolio_id, schedule_id in schedules.items()]
-        self._patch("/billable_portfolios/relationships/fee_schedules", json={"data":
-            _bulk_data(resources, "create_billable_portfolio", max_items=500)})
+        resources = [
+            _resource(
+                "create_billable_portfolio", {"schedule_id": schedule_id}, portfolio_id
+            )
+            for portfolio_id, schedule_id in schedules.items()
+        ]
+        self._patch(
+            "/billable_portfolios/relationships/fee_schedules",
+            json={
+                "data": _bulk_data(
+                    resources, "create_billable_portfolio", max_items=500
+                )
+            },
+        )
 
     def archive_billable_portfolios(self, portfolio_ids: Sequence[str]) -> None:
         """Archive up to 500 portfolios in a single API request."""
-        self._delete("/billable_portfolios/relationships/fee_schedules", json={"data":
-            _bulk_data([{"id": str(value)} for value in portfolio_ids],
-                       "billable_portfolios", max_items=500)})
+        self._delete(
+            "/billable_portfolios/relationships/fee_schedules",
+            json={
+                "data": _bulk_data(
+                    [{"id": str(value)} for value in portfolio_ids],
+                    "billable_portfolios",
+                    max_items=500,
+                )
+            },
+        )
 
     def update_payout_rule(self, portfolio_id: str, rule_id: str) -> None:
-        self._patch(f"/billable_portfolios/{portfolio_id}/relationships/payout_rule",
-                    json={"data": {"id": str(rule_id), "type": "payout_rule"}})
+        self._patch(
+            f"/billable_portfolios/{portfolio_id}/relationships/payout_rule",
+            json={"data": {"id": str(rule_id), "type": "payout_rule"}},
+        )
 
     def remove_payout_rule(self, portfolio_id: str) -> None:
         self._delete(f"/billable_portfolios/{portfolio_id}/relationships/payout_rule")

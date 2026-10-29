@@ -5,7 +5,7 @@ from typing import Any, Dict, Generator, List, Mapping, Optional
 
 from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
-from .billing import _resource
+from ..billing.fees import _resource
 
 
 class ReportSchedulesResource(BaseResource):

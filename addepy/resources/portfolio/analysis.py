@@ -197,9 +197,9 @@ class AnalysisResource(BaseResource):
         columns: List[Dict[str, Any]],
         groupings: List[Union[str, Dict[str, Any]]],
         portfolio_type: PortfolioType,
-        portfolio_id: Union[int, List[int]],
-        start_date: str,
-        end_date: str,
+        portfolio_id: Optional[Union[int, List[int]]] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         *,
         filters: Optional[List[Dict[str, Any]]] = None,
         hide_previous_holdings: Optional[bool] = None,
@@ -216,14 +216,14 @@ class AnalysisResource(BaseResource):
         Args:
             columns: List of column attributes with optional arguments.
                 Each column is a dict with 'key' and optional 'arguments'.
-            groupings: List of grouping attributes. Can be strings (attribute
-                keys) or dicts with 'key' and optional 'arguments'.
+            groupings: List of grouping attributes. Strings become objects with
+                a 'key'; dicts with 'key' and optional 'arguments' are retained.
             portfolio_type: Type of portfolio. One of:
                 ENTITY, ENTITY_FUNDS, GROUP, GROUP_FUNDS, FIRM,
                 FIRM_ACCOUNTS, FIRM_CLIENTS, FIRM_HOUSEHOLDS,
                 FIRM_UNVERIFIED_ACCOUNTS.
-            portfolio_id: Portfolio ID or list of IDs. If portfolio_type
-                is FIRM, must be 1.
+            portfolio_id: Portfolio ID or list of IDs; omit when supplying
+                external_ids. If portfolio_type is FIRM, must be 1.
             start_date: Start date of the time period (YYYY-MM-DD).
             end_date: End date of the time period (YYYY-MM-DD).
             filters: Optional list of filter objects. Each filter has:
@@ -243,7 +243,7 @@ class AnalysisResource(BaseResource):
                 Dict with 'type' ('none', 'top', 'all', 'weighted') and
                 optional 'threshold'.
             display_account_fees: Show account fees.
-            external_ids: Use external IDs instead of portfolio_id. List of
+            external_ids: Supply exactly one of external_ids and portfolio_id. List of
                 dicts with 'external_type_key' and 'external_id'.
 
         Returns:
@@ -281,14 +281,24 @@ class AnalysisResource(BaseResource):
             for child in total["children"]:
                 print(f"  {child['name']}: {child['columns']}")
         """
+        if start_date is None or end_date is None:
+            raise ValueError("start_date and end_date are required")
+        if isinstance(portfolio_id, list) and not portfolio_id and external_ids is not None:
+            portfolio_id = None
+        if (portfolio_id is None) == (external_ids is None):
+            raise ValueError("Supply exactly one of portfolio_id or external_ids")
         attributes: Dict[str, Any] = {
             "columns": columns,
-            "groupings": groupings,
+            "groupings": [
+                {"key": grouping} if isinstance(grouping, str) else grouping
+                for grouping in groupings
+            ],
             "portfolio_type": portfolio_type.upper(),
-            "portfolio_id": portfolio_id,
             "start_date": start_date,
             "end_date": end_date,
         }
+        if portfolio_id is not None:
+            attributes["portfolio_id"] = portfolio_id
 
         # Add optional parameters
         if filters is not None:

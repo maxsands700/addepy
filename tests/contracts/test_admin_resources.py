@@ -7,10 +7,10 @@ import pytest
 import requests
 
 from addepy.resources.admin import AdminNamespace
-from addepy.resources.admin.billing import FeesResource, FeeSchedulesResource
-from addepy.resources.admin.billable_portfolios import BillablePortfoliosResource
+from addepy.resources.billing.fees import FeesResource, FeeSchedulesResource
+from addepy.resources.billing.billable_portfolios import BillablePortfoliosResource
 from addepy.resources.admin.files import FilesResource
-from addepy.resources.admin.payouts import PayoutRecipientsResource, PayoutRulesResource
+from addepy.resources.billing.payouts import PayoutRecipientsResource, PayoutRulesResource
 from addepy.resources.admin.report_schedules import ReportSchedulesResource
 from addepy.resources.admin.reports import ReportsResource
 
@@ -49,7 +49,7 @@ def test_fee_creation_uses_array_and_preserves_unknown_fields():
 
 
 def test_fee_replacement_is_put_and_preserves_relationships():
-    relationships = {"fee_schedules": {"data": [{"type": "fee_schedules", "id": "3"}]}}
+    relationships = {"future_relationship": {"data": [{"type": "future_type", "id": "3"}]}}
     client = FakeClient({"data": [{"id": "1", "type": "fees"}]})
     FeesResource(client).replace_fee(
         "1", {"name": "Updated", "description": None}, relationships=relationships
@@ -409,10 +409,6 @@ def test_report_generation_supports_brand_without_losing_legacy_options():
 def test_admin_resources_are_discoverable_and_reuse_instances():
     admin = AdminNamespace(FakeClient())
     for name, factory in [
-        ("fees", FeesResource),
-        ("fee_schedules", FeeSchedulesResource),
-        ("payout_recipients", PayoutRecipientsResource),
-        ("payout_rules", PayoutRulesResource),
         ("report_schedules", ReportSchedulesResource),
     ]:
         assert isinstance(getattr(admin, name), factory)

@@ -89,22 +89,22 @@ READ_CHECKS = {
     "report_schedules": Check(
         "/report_schedule", "admin.report_schedules.list_schedules", list
     ),
-    "fees": Check("/fees", "admin.fees.list_fees", list),
+    "fees": Check("/fees", "billing.fees.list_fees", list),
     "fee_schedules": Check(
-        "/fee_schedules", "admin.fee_schedules.list_fee_schedules", list
+        "/fee_schedules", "billing.fee_schedules.list_fee_schedules", list
     ),
     "billable_portfolios": Check(
         "/billable_portfolios",
-        "admin.billable_portfolios.list_billable_portfolios",
+        "billing.billable_portfolios.list_billable_portfolios",
         list,
     ),
     "payout_recipients": Check(
         "/billing/payout/recipients",
-        "admin.payout_recipients.list_payout_recipients",
+        "billing.payout_recipients.list_payout_recipients",
         list,
     ),
     "payout_rules": Check(
-        "/billing/payout/rules", "admin.payout_rules.list_payout_rules", list
+        "/billing/payout/rules", "billing.payout_rules.list_payout_rules", list
     ),
 }
 DEFAULT_CHECKS = ("current_user", "entities", "portfolio_views")

@@ -1,7 +1,7 @@
 """Representative offline contracts from the linked ownership and query guides.
 
 Fixtures exercise documented wire shapes, not an available Addepar tenant.
-See docs/resources.md for ownership and query conventions.
+See docs/ownership.md and docs/portfolio.md for ownership and query conventions.
 """
 
 from copy import deepcopy
@@ -481,7 +481,7 @@ def test_portfolio_query_helper_keeps_argument_filters_false_flags_and_metadata(
             "type": "portfolio_query",
             "attributes": {
                 "columns": columns,
-                "groupings": ["asset_class"],
+                "groupings": [{"key": "asset_class"}],
                 "portfolio_type": "ENTITY",
                 "portfolio_id": [329263],
                 "start_date": "2024-01-01",

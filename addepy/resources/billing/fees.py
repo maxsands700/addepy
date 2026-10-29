@@ -1,7 +1,8 @@
-"""Fees and fee schedules. Replacement methods use PUT, including relationships.
+"""Fees and fee schedules, including their documented expansions.
 
 Single methods return resource dictionaries; bulk methods return lists. Attribute
-and relationship mappings are passed through so new server fields remain usable.
+and relationship mappings remain open for new server fields. Fee schedule
+assignments are managed through FeeSchedulesResource, not fee writes.
 """
 
 from copy import deepcopy
@@ -56,21 +57,92 @@ def _bulk_data(
     return result
 
 
+def _include_params(include: Optional[str]) -> Optional[Dict[str, Any]]:
+    return {"include": include} if include is not None else None
+
+
+def _validate_fee_write(resource: Mapping[str, Any], *, create: bool = False) -> None:
+    if "fee_schedules" in (resource.get("relationships") or {}):
+        raise ValueError(
+            "fee_schedules is read-only on fees; use fee_schedules.add_fees(), "
+            "replace_fees(), or remove_fees() to manage assignments"
+        )
+    if create and "rate_asset_valuation" in (resource.get("attributes") or {}):
+        raise ValueError("rate_asset_valuation can only be set when replacing a fee")
+
+
+def _schedule_resources(
+    schedules: Sequence[Mapping[str, Any]], *, require_id: bool = False
+) -> List[Dict[str, Any]]:
+    resources = _bulk_data(schedules, "fee_schedules", require_id=require_id)
+    for resource in resources:
+        fees = (resource.get("relationships") or {}).get("fees") or {}
+        data = fees.get("data")
+        if not isinstance(data, list) or not data:
+            raise ValueError("Each fee schedule requires at least one fee association")
+        for fee in data:
+            if (
+                not isinstance(fee, Mapping)
+                or fee.get("type") != "fees"
+                or "id" not in fee
+            ):
+                raise ValueError("Fee associations must contain an id and type 'fees'")
+    return resources
+
+
 class FeesResource(BaseResource):
     """Manage /fees; server validates the fee structure and required fields."""
 
-    def get_fee(self, fee_id: str) -> Dict[str, Any]:
-        return _single_data(self._get(f"/fees/{fee_id}"))
+    def get_fee(
+        self, fee_id: str, *, include: Optional[str] = None, full_document: bool = False
+    ) -> Dict[str, Any]:
+        """Get a fee, optionally expanding ``include='fee_schedules'``.
+
+        Set ``full_document=True`` to retain top-level included resources,
+        metadata, and links. Otherwise return the fee resource as before.
+        """
+        response = self._get(f"/fees/{fee_id}", params=_include_params(include))
+        return response.json() if full_document else _single_data(response)
+
+    def iter_fee_pages(
+        self,
+        *,
+        include: Optional[str] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+        max_pages: Optional[int] = None,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """Yield complete fee documents, retaining ``included``, links, and metadata."""
+        return self.iter_pages(
+            "/fees",
+            params=_include_params(include),
+            page_limit=min(page_limit, 500),
+            max_pages=max_pages,
+        )
 
     def iter_fees(
-        self, *, limit: Optional[int] = None, page_limit: int = DEFAULT_PAGE_LIMIT
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+        include: Optional[str] = None,
     ) -> Generator[Dict[str, Any], None, None]:
-        return self._paginate("/fees", page_limit=min(page_limit, 500), max_items=limit)
+        """Yield fee resources; use iter_fee_pages() to retain expanded resources."""
+        return self._paginate(
+            "/fees",
+            params=_include_params(include),
+            page_limit=min(page_limit, 500),
+            max_items=limit,
+        )
 
     def list_fees(
-        self, *, limit: int = DEFAULT_LIST_LIMIT, page_limit: int = DEFAULT_PAGE_LIMIT
+        self,
+        *,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+        include: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        return list(self.iter_fees(limit=limit, page_limit=page_limit))
+        """List fee resources; use iter_fee_pages() to retain expanded resources."""
+        return list(self.iter_fees(limit=limit, page_limit=page_limit, include=include))
 
     def create_fee(
         self,
@@ -79,20 +151,21 @@ class FeesResource(BaseResource):
         relationships: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
         """Create one fee; the API requires an array for fee creation."""
+        resource = _resource("fees", attributes, relationships=relationships)
+        _validate_fee_write(resource, create=True)
         return _single_data(
             self._post(
                 "/fees",
-                json={
-                    "data": [_resource("fees", attributes, relationships=relationships)]
-                },
+                json={"data": [resource]},
             )
         )
 
     def create_fees(self, fees: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
-        """Create JSON:API resource objects with attributes and optional relationships."""
-        return self._post("/fees", json={"data": _bulk_data(fees, "fees")}).json()[
-            "data"
-        ]
+        """Create up to 500 fee resources; fee schedule assignments are read-only."""
+        resources = _bulk_data(fees, "fees", max_items=500)
+        for resource in resources:
+            _validate_fee_write(resource, create=True)
+        return self._post("/fees", json={"data": resources}).json()["data"]
 
     def replace_fee(
         self,
@@ -101,19 +174,24 @@ class FeesResource(BaseResource):
         *,
         relationships: Optional[Mapping[str, Any]] = None,
     ) -> Dict[str, Any]:
-        """Fully replace a fee, including relationships; omitted fields are not retained."""
+        """Fully replace a fee; set fee assignments on the fee schedule resource."""
+        resource = _resource("fees", attributes, fee_id, relationships)
+        _validate_fee_write(resource)
         return _single_data(
             self._put(
                 f"/fees/{fee_id}",
-                json={"data": _resource("fees", attributes, fee_id, relationships)},
+                json={"data": resource},
             )
         )
 
     def replace_fees(self, fees: Sequence[Mapping[str, Any]]) -> List[Dict[str, Any]]:
         """Fully replace up to 500 complete resource objects, each including its id."""
+        resources = _bulk_data(fees, "fees", require_id=True, max_items=500)
+        for resource in resources:
+            _validate_fee_write(resource)
         return self._put(
             "/fees",
-            json={"data": _bulk_data(fees, "fees", require_id=True, max_items=500)},
+            json={"data": resources},
         ).json()["data"]
 
     def delete_fee(self, fee_id: str) -> None:
@@ -137,23 +215,67 @@ class FeesResource(BaseResource):
 class FeeSchedulesResource(BaseResource):
     """Manage /fee_schedules and their fee relationships."""
 
-    def get_fee_schedule(self, schedule_id: str) -> Dict[str, Any]:
-        return _single_data(self._get(f"/fee_schedules/{schedule_id}"))
+    def get_fee_schedule(
+        self,
+        schedule_id: str,
+        *,
+        include: Optional[str] = None,
+        full_document: bool = False,
+    ) -> Dict[str, Any]:
+        """Get a schedule, optionally expanding ``include='fees'``.
+
+        Set ``full_document=True`` to retain top-level included resources,
+        metadata, and links. Otherwise return the schedule resource as before.
+        """
+        response = self._get(
+            f"/fee_schedules/{schedule_id}", params=_include_params(include)
+        )
+        return response.json() if full_document else _single_data(response)
+
+    def iter_fee_schedule_pages(
+        self,
+        *,
+        include: Optional[str] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+        max_pages: Optional[int] = None,
+    ) -> Generator[Dict[str, Any], None, None]:
+        """Yield complete schedule documents, retaining expanded ``include='fees'``."""
+        return self.iter_pages(
+            "/fee_schedules",
+            params=_include_params(include),
+            page_limit=min(page_limit, 500),
+            max_pages=max_pages,
+        )
 
     def iter_fee_schedules(
-        self, *, limit: Optional[int] = None, page_limit: int = DEFAULT_PAGE_LIMIT
+        self,
+        *,
+        limit: Optional[int] = None,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+        include: Optional[str] = None,
     ) -> Generator[Dict[str, Any], None, None]:
         return self._paginate(
-            "/fee_schedules", page_limit=min(page_limit, 500), max_items=limit
+            "/fee_schedules",
+            params=_include_params(include),
+            page_limit=min(page_limit, 500),
+            max_items=limit,
         )
 
     def list_fee_schedules(
-        self, *, limit: int = DEFAULT_LIST_LIMIT, page_limit: int = DEFAULT_PAGE_LIMIT
+        self,
+        *,
+        limit: int = DEFAULT_LIST_LIMIT,
+        page_limit: int = DEFAULT_PAGE_LIMIT,
+        include: Optional[str] = None,
     ) -> List[Dict[str, Any]]:
-        return list(self.iter_fee_schedules(limit=limit, page_limit=page_limit))
+        return list(
+            self.iter_fee_schedules(limit=limit, page_limit=page_limit, include=include)
+        )
 
     @staticmethod
     def _fees(fee_ids: Sequence[str]) -> Dict[str, Any]:
+        if not fee_ids:
+            raise ValueError("At least one fee association is required")
         return {
             "fees": {"data": [{"type": "fees", "id": str(value)} for value in fee_ids]}
         }
@@ -166,9 +288,13 @@ class FeeSchedulesResource(BaseResource):
             self._post(
                 "/fee_schedules",
                 json={
-                    "data": _resource(
-                        "fee_schedules", attributes, relationships=self._fees(fee_ids)
-                    )
+                    "data": [
+                        _resource(
+                            "fee_schedules",
+                            attributes,
+                            relationships=self._fees(fee_ids),
+                        )
+                    ]
                 },
             )
         )
@@ -178,7 +304,7 @@ class FeeSchedulesResource(BaseResource):
     ) -> List[Dict[str, Any]]:
         """Create complete JSON:API resources, including attributes and fee relationships."""
         return self._post(
-            "/fee_schedules", json={"data": _bulk_data(schedules, "fee_schedules")}
+            "/fee_schedules", json={"data": _schedule_resources(schedules)}
         ).json()["data"]
 
     def replace_fee_schedule(
@@ -202,7 +328,7 @@ class FeeSchedulesResource(BaseResource):
         """PUT complete JSON:API resources with id, attributes and fee relationships."""
         return self._put(
             "/fee_schedules",
-            json={"data": _bulk_data(schedules, "fee_schedules", require_id=True)},
+            json={"data": _schedule_resources(schedules, require_id=True)},
         ).json()["data"]
 
     def delete_fee_schedule(self, schedule_id: str) -> None:

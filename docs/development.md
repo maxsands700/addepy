@@ -1,77 +1,63 @@
-# Development
+# Development and diagnostics
 
-## Local checks
+## Offline checks
 
-From the repository root, using Python 3.10+:
+Python 3.10+; CI covers 3.10–3.14. From the repository root:
 
 ```bash
 python -m venv .venv
+.venv/bin/python -m pip install -e '.[dev,dataframe]'
+.venv/bin/python -m pytest
+.venv/bin/ruff check addepy tests
+.venv/bin/python -m build
 ```
 
-Activate with `source .venv/bin/activate` on macOS/Linux or `.venv\Scripts\Activate.ps1` in Windows PowerShell, then:
+On Windows use `.venv\Scripts\python` and `.venv\Scripts\ruff`.
+Tests block network access and clear inherited Addepar variables. Optional reports:
 
 ```bash
-python -m pip install -e '.[dev,dataframe]'
-python -m pytest
-ruff check addepy tests
-python -m build
-```
-
-Tests block network access and clear inherited Addepar settings. CI runs tests, lint, and packaging on Python 3.10–3.14. To capture coverage or machine-readable results:
-
-```bash
-python -m pytest --cov=addepy --cov-report=html:test-results/coverage --junitxml=test-results/offline.xml
+.venv/bin/python -m pytest --cov=addepy --cov-report=html:test-results/coverage --junitxml=test-results/offline.xml
 ```
 
 ## Live diagnostics
 
-From a computer with Addepar API access, configure a private credential file as described in [configuration](configuration.md). For sandbox, copy [`.env.example`](../.env.example) to `.env.sandbox`, set `ADDEPAR_ENVIRONMENT=sandbox`, and enter that environment's credentials.
+Run explicitly from a host with API access. Credentials come from the named
+file; ambient credentials are ignored. Configure the environment in that file.
 
 ```bash
+python -m addepy.diagnostics --list-checks
 python -m addepy.diagnostics --env-file .env.sandbox --read-only
+python -m addepy.diagnostics --env-file .env.sandbox --portfolio-query live-queries/portfolio.json --transaction-query live-queries/transactions.json
 ```
 
-This checks the current user, entities, and portfolio views. To verify both query flows, save small working queries under the ignored `live-queries/` directory:
-
-```bash
-python -m addepy.diagnostics --env-file .env.sandbox --portfolio-query live-queries/portfolio.json --transaction-query live-queries/transactions.json --job-timeout 1200
-```
-
-Queries create temporary exports. Diagnostics permit reads and those export submissions, with no business-data writes. They download and validate the results, then discard the contents. `--read-only` disables submissions but permits checking existing jobs:
+Default checks: current user, entities, portfolio views. Query files submit
+exports, validate downloaded results, then discard content. `--read-only`
+disables submissions and permits inspection of existing jobs:
 
 ```bash
 python -m addepy.diagnostics --env-file .env.sandbox --read-only --only portfolio_job --portfolio-job-id YOUR_JOB_ID --job-timeout 1200
 ```
 
-For transactions, use `--only transaction_job --transaction-job-id YOUR_JOB_ID`. Resume the existing ID after a timeout instead of submitting again. See [portfolio completion behavior](jobs.md#portfolio-completion-behavior) for the live response without a status field.
+Transaction equivalent: `--only transaction_job --transaction-job-id YOUR_JOB_ID`.
+Resume an existing ID after a timeout. Production/custom hosts require
+`--production`; no automatic environment fallback occurs.
 
-For production, use a file with production settings and pass both `--env-file .env.production --production`. Custom API hosts also require `--production`; there is no fallback between environments. The credential file must be explicit, and ambient credentials are ignored.
-
-Useful options:
-
-| Option | Purpose |
+| Options | Meaning/default |
 | --- | --- |
-| `--list-checks` | List available checks without making requests. |
-| `--extended --entity-id YOUR_ENTITY_ID` | Include additional read endpoints; benchmark proxies and estimated returns need the entity filter. |
-| `--only entities,report_schedules` | Select checks by name. |
-| `--job-timeout 1200` | Polling deadline per job; default is 120 seconds. |
-| `--poll-interval 5` | Seconds between polls; default is 5. |
-| `--request-timeout 30` | Request timeout; default is 30 seconds. |
-| `--max-result-bytes 10485760` | Download inspection limit; default is 10 MiB. |
-| `--report-dir test-results/live` | Report directory; shown here with its default. |
+| `--extended --entity-id ID` | Additional resource reads; entity filter required for proxies/estimated returns. |
+| `--only entities,report_schedules` | Select checks; repeatable. |
+| `--environment`, `--base-url` | Explicit configuration overrides. |
+| `--portfolio-query`, `--transaction-query` | Raw JSON file; mutually exclusive with the corresponding `--*-job-id`. |
+| `--job-timeout`, `--poll-interval`, `--request-timeout` | 120 / 5 / 30 seconds. |
+| `--max-result-bytes` | Download inspection cap; 10485760 bytes. |
+| `--report-dir` | `test-results/live`; timestamped JSON and Markdown. |
 
-## Reports
+Reports include outcomes, HTTP codes, durations, job IDs/status/progress; omit
+credentials, query values, and response content. Missing status/progress remains
+null unless a valid completed portfolio result establishes completion. Exit codes:
+`0` all passed; `1` contract/internal failure; `2` configuration/inconclusive.
+Authentication failures and rate limits stop further checks. See
+[Jobs](jobs.md) for portfolio completion behavior.
 
-Each run writes timestamped JSON and Markdown reports. They contain outcomes, HTTP codes, durations, and job IDs/status/progress; they omit credentials, query values, and response data. Status remains `null` until captured or inferred from a valid completed portfolio result; missing progress remains `null`. A `Completed` job can still fail result validation.
-
-| Outcome | Next step |
-| --- | --- |
-| `pass` | The selected check succeeded. |
-| `contract_failure`, `internal_error` | Inspect the query and SDK behavior. |
-| `auth_blocked`, `permission_blocked` | Check credentials or access. |
-| `unavailable`, `network_error` | Check the resource ID, expiry, endpoint, or connection. |
-| `rate_limited` | Retry after the server's rate limit clears. |
-| `missing_input`, `skipped`, `incomplete` | Supply inputs, adjust limits, or resume the job. |
-| `policy_blocked`, `config_error` | Correct the runner's configuration. |
-
-Exit codes are `0` for all selected checks passed, `1` for contract/internal failures, and `2` for configuration or inconclusive checks. Authentication failures and rate limits stop further checks. Reports and queries are Git-ignored. When reporting an issue, include the reports, `git rev-parse HEAD`, Python version, and operating system.
+Implementation: [diagnostics.py](../addepy/diagnostics.py),
+[offline contracts](../tests/contracts/), [CI](../.github/workflows/tests.yml).

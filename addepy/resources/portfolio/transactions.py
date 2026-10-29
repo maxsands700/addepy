@@ -61,6 +61,7 @@ TRANSACTION_TYPES = {
     "loan_taken",
     "lookthrough_adjustment",
     "mark_to_market",
+    "node_fee",
     "payment_made_in_lieu_of_dividend",
     "payment_received_in_lieu_of_dividend",
     "proceeds_adjustment",
@@ -144,12 +145,14 @@ class TransactionsResource(BaseResource):
         transaction_type: TransactionType,
         currency: str,
         trade_date: str,
-        owner_id: str,
-        owned_id: str,
+        owner_id: Optional[str] = None,
+        owned_id: Optional[str] = None,
         *,
         amount: Optional[float] = None,
         units: Optional[float] = None,
         cash_position_id: Optional[str] = None,
+        new_owner_id: Optional[str] = None,
+        new_owned_id: Optional[str] = None,
         **attributes: Any,
     ) -> Dict[str, Any]:
         """
@@ -159,11 +162,14 @@ class TransactionsResource(BaseResource):
             transaction_type: Type of transaction (e.g., 'buy', 'sell', 'distribution').
             currency: Three-letter currency code (e.g., 'USD').
             trade_date: Trade date in YYYY-MM-DD format.
-            owner_id: ID of the owning entity.
+            owner_id: ID of the owning entity. Omit for account/node fees when
+                the cash position is unknown; the owner relationship is omitted.
             owned_id: ID of the owned entity (security).
             amount: Transaction value. Required for valuations and value-based assets.
             units: Number of shares. Required for share-based assets.
             cash_position_id: Optional ID of the cash position.
+            new_owner_id: Receiving owner entity for a transfer.
+            new_owned_id: New owned entity for a corporate action.
             **attributes: Additional transaction attributes (e.g., fee, comment,
                 description, posted_date, settlement_date, ex_date, etc.).
 
@@ -173,6 +179,12 @@ class TransactionsResource(BaseResource):
         Raises:
             AddePyError: If transaction creation fails.
         """
+        if owned_id is None:
+            raise ValueError("owned_id is required")
+        if owner_id is None and not (
+            transaction_type == "node_fee" or transaction_type.startswith("account_fee")
+        ):
+            raise ValueError("owner_id is required except for account/node fee transactions")
         tx_attributes: Dict[str, Any] = {
             "type": transaction_type,
             "currency": currency,
@@ -185,12 +197,21 @@ class TransactionsResource(BaseResource):
             tx_attributes["units"] = units
 
         relationships: Dict[str, Any] = {
-            "owner": {"data": {"type": "entities", "id": owner_id}},
             "owned": {"data": {"type": "entities", "id": owned_id}},
         }
+        if owner_id is not None:
+            relationships["owner"] = {"data": {"type": "entities", "id": owner_id}}
         if cash_position_id is not None:
             relationships["cash_position"] = {
                 "data": {"type": "positions", "id": cash_position_id}
+            }
+        if new_owner_id is not None:
+            relationships["new_owner"] = {
+                "data": {"type": "entities", "id": new_owner_id}
+            }
+        if new_owned_id is not None:
+            relationships["new_owned"] = {
+                "data": {"type": "entities", "id": new_owned_id}
             }
 
         payload = {
@@ -219,9 +240,10 @@ class TransactionsResource(BaseResource):
                 - type: Transaction type (e.g., 'buy', 'sell')
                 - currency: Three-letter currency code
                 - trade_date: YYYY-MM-DD format
-                - owner_id: Owning entity ID
+                - owner_id: Owning entity ID (omit for account/node fees)
                 - owned_id: Owned entity ID
-                - Plus optional: amount, units, cash_position_id, and other attributes
+                - Plus optional: amount, units, cash_position_id, new_owner_id,
+                  new_owned_id, and other attributes
 
         Returns:
             List of created transaction resource objects.
@@ -252,24 +274,35 @@ class TransactionsResource(BaseResource):
             ]
             created = client.portfolio.transactions.create_transactions(transactions)
         """
+        if not 1 <= len(transactions) <= 500:
+            raise ValueError("transactions must contain between 1 and 500 items")
         payload_data = []
         for tx in transactions:
-            owner_id = tx["owner_id"]
             owned_id = tx["owned_id"]
+            owner_id = tx.get("owner_id")
+            if owner_id is None and not (
+                tx.get("type") == "node_fee" or str(tx.get("type", "")).startswith("account_fee")
+            ):
+                raise ValueError("owner_id is required except for account/node fee transactions")
             cash_position_id = tx.get("cash_position_id")
             attributes = deepcopy({
                 key: value for key, value in tx.items()
-                if key not in {"owner_id", "owned_id", "cash_position_id"}
+                if key not in {"owner_id", "owned_id", "cash_position_id", "new_owner_id", "new_owned_id"}
             })
 
             relationships: Dict[str, Any] = {
-                "owner": {"data": {"type": "entities", "id": owner_id}},
                 "owned": {"data": {"type": "entities", "id": owned_id}},
             }
+            if owner_id is not None:
+                relationships["owner"] = {"data": {"type": "entities", "id": owner_id}}
             if cash_position_id is not None:
                 relationships["cash_position"] = {
                     "data": {"type": "positions", "id": cash_position_id}
                 }
+            for key in ("new_owner", "new_owned"):
+                value = tx.get(f"{key}_id")
+                if value is not None:
+                    relationships[key] = {"data": {"type": "entities", "id": value}}
 
             payload_data.append({
                 "type": "transactions",
@@ -347,6 +380,8 @@ class TransactionsResource(BaseResource):
             ]
             updated = client.portfolio.transactions.update_transactions(updates)
         """
+        if not 1 <= len(transactions) <= 500:
+            raise ValueError("transactions must contain between 1 and 500 items")
         payload = {
             "data": [
                 {
@@ -387,6 +422,8 @@ class TransactionsResource(BaseResource):
         Note:
             Cannot be used for snapshots or valuations. Use Snapshots API instead.
         """
+        if not 1 <= len(transaction_ids) <= 500:
+            raise ValueError("transaction_ids must contain between 1 and 500 items")
         payload = {
             "data": [
                 {"id": tx_id, "type": "transactions"}
@@ -449,6 +486,72 @@ class TransactionsResource(BaseResource):
         logger.debug(f"Retrieved cash position for transaction {transaction_id}")
         return position
 
+    def get_transaction_new_owner(self, transaction_id: str) -> Dict[str, Any]:
+        """Get the receiving owner entity for a transfer transaction."""
+        return self._get(f"/transactions/{transaction_id}/new_owner").json().get("data", {})
+
+    def get_transaction_new_owned(self, transaction_id: str) -> Dict[str, Any]:
+        """Get the new owned entity for a corporate action transaction."""
+        return self._get(f"/transactions/{transaction_id}/new_owned").json().get("data", {})
+
+    def get_transaction_owner_relationship(self, transaction_id: str) -> Dict[str, Any]:
+        """Get owner linkage containing the entity ID and resource type."""
+        return self._get(
+            f"/transactions/{transaction_id}/relationships/owner"
+        ).json().get("data", {})
+
+    def get_transaction_owned_relationship(self, transaction_id: str) -> Dict[str, Any]:
+        """Get owned-entity linkage containing its ID and resource type."""
+        return self._get(
+            f"/transactions/{transaction_id}/relationships/owned"
+        ).json().get("data", {})
+
+    def get_transaction_new_owner_relationship(self, transaction_id: str) -> Dict[str, Any]:
+        """Get receiving-owner linkage for a transfer transaction."""
+        return self._get(
+            f"/transactions/{transaction_id}/relationships/new_owner"
+        ).json().get("data", {})
+
+    def get_transaction_new_owned_relationship(self, transaction_id: str) -> Dict[str, Any]:
+        """Get new-owned-entity linkage for a corporate action transaction."""
+        return self._get(
+            f"/transactions/{transaction_id}/relationships/new_owned"
+        ).json().get("data", {})
+
+    def get_transaction_cash_account_relationship(self, transaction_id: str) -> Dict[str, Any]:
+        """Get cash-position linkage from the documented cash_account route.
+
+        Addepar names the related resource route ``cash_position`` and the
+        linkage route ``relationships/cash_account``.
+        """
+        return self._get(
+            f"/transactions/{transaction_id}/relationships/cash_account"
+        ).json().get("data", {})
+
+    def get_transaction_files(self, transaction_id: str) -> Dict[str, Any]:
+        """Return attachment visibility, management permissions, and items.
+
+        The returned data contains ``visible``, ``can_manage_files``, and
+        ``items`` directly, without the standalone Files API's documents
+        container. Requires transaction read and Files edit permissions.
+        """
+        return self._get(f"/transactions/{transaction_id}/files").json().get("data", {})
+
+    def attach_transaction_file(self, transaction_id: str, file_id: str) -> None:
+        """Attach an existing file; repeating the association is idempotent.
+
+        Requires transaction read and Files edit permissions. Upload the file
+        first using ``client.admin.files.upload_file``.
+        """
+        self._post(
+            f"/transactions/{transaction_id}/files",
+            json={"data": {"id": file_id, "type": "files"}},
+        )
+
+    def detach_transaction_file(self, transaction_id: str, file_id: str) -> None:
+        """Detach a file association, preserving the underlying file record."""
+        self._delete(f"/transactions/{transaction_id}/files/{file_id}")
+
     # =========================================================================
     # View and Query Methods
     # =========================================================================
@@ -510,9 +613,9 @@ class TransactionsResource(BaseResource):
         self,
         columns: List[str],
         portfolio_type: PortfolioType,
-        portfolio_id: Union[str, List[str]],
-        start_date: str,
-        end_date: str,
+        portfolio_id: Optional[Union[str, int, List[Union[str, int]]]] = None,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         *,
         filters: Optional[List[Dict[str, Any]]] = None,
         sorting: Optional[List[Dict[str, Any]]] = None,
@@ -520,6 +623,7 @@ class TransactionsResource(BaseResource):
         include_online_valuations: bool = False,
         include_unverified: bool = False,
         include_deleted: bool = False,
+        external_ids: Optional[List[Dict[str, str]]] = None,
     ) -> Dict[str, Any]:
         """
         Query transaction data (synchronous).
@@ -531,7 +635,8 @@ class TransactionsResource(BaseResource):
             portfolio_type: Type of portfolio. One of: ENTITY, ENTITY_FUNDS, GROUP,
                 GROUP_FUNDS, FIRM, FIRM_ACCOUNTS, FIRM_CLIENTS, FIRM_HOUSEHOLDS,
                 FIRM_UNVERIFIED_ACCOUNTS.
-            portfolio_id: Portfolio ID or list of IDs. Use "1" if portfolio_type is FIRM.
+            portfolio_id: Portfolio ID or list of IDs; omit when using external_ids.
+                Use "1" if portfolio_type is FIRM.
             start_date: Start date in YYYY-MM-DD format.
             end_date: End date in YYYY-MM-DD format.
             filters: Optional list of filter objects. Each filter has:
@@ -547,6 +652,8 @@ class TransactionsResource(BaseResource):
             include_online_valuations: Include online snapshots (default: False).
             include_unverified: Include unverified transactions (default: False).
             include_deleted: Include deleted online transactions (default: False).
+            external_ids: External ID dictionaries with external_type_key and
+                external_id. Supply exactly one of external_ids and portfolio_id.
 
         Returns:
             Dictionary with 'meta' (columns) and 'data' (transaction records).
@@ -571,6 +678,12 @@ class TransactionsResource(BaseResource):
                 sorting=[{"attribute": "trade_date", "ascending": False}],
             )
         """
+        if start_date is None or end_date is None:
+            raise ValueError("start_date and end_date are required")
+        if isinstance(portfolio_id, list) and not portfolio_id and external_ids is not None:
+            portfolio_id = None
+        if (portfolio_id is None) == (external_ids is None):
+            raise ValueError("Supply exactly one of portfolio_id or external_ids")
         # Normalize portfolio_id to list if needed
         if isinstance(portfolio_id, str):
             portfolio_id = [portfolio_id]
@@ -578,13 +691,16 @@ class TransactionsResource(BaseResource):
         query_attributes: Dict[str, Any] = {
             "columns": columns,
             "portfolio_type": portfolio_type.upper(),
-            "portfolio_id": portfolio_id,
             "start_date": start_date,
             "end_date": end_date,
             "include_online_valuations": include_online_valuations,
             "include_unverified": include_unverified,
             "include_deleted": include_deleted,
         }
+        if portfolio_id is not None:
+            query_attributes["portfolio_id"] = portfolio_id
+        if external_ids is not None:
+            query_attributes["external_ids"] = external_ids
 
         if filters is not None:
             query_attributes["filters"] = filters

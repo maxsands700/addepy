@@ -69,9 +69,9 @@ class TransactionJobsResource(JobResource):
         self,
         columns: list[str],
         portfolio_type: PortfolioType,
-        portfolio_id: str | list[str],
-        start_date: str,
-        end_date: str,
+        portfolio_id: str | int | list[str | int] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         *,
         filters: list[dict[str, Any]] | None = None,
         sorting: list[dict[str, Any]] | None = None,
@@ -79,25 +79,37 @@ class TransactionJobsResource(JobResource):
         include_online_valuations: bool = False,
         include_unverified: bool = False,
         include_deleted: bool = False,
+        external_ids: list[dict[str, str]] | None = None,
     ) -> str:
         """Build and submit a transaction query; use ``create_job`` for raw JSON.
 
         ``sorting`` follows the request example in the transaction-jobs guide;
         the guide's parameter table instead says ``sortings``. A raw query can
         pass either field unchanged if the firm's API requires that spelling.
+        Supply exactly one of ``portfolio_id`` or ``external_ids``; dates are
+        required for both scopes.
         """
+        if start_date is None or end_date is None:
+            raise ValueError("start_date and end_date are required")
+        if isinstance(portfolio_id, list) and not portfolio_id and external_ids is not None:
+            portfolio_id = None
+        if (portfolio_id is None) == (external_ids is None):
+            raise ValueError("Supply exactly one of portfolio_id or external_ids")
         parameters: dict[str, Any] = {
             "columns": columns,
             "portfolio_type": portfolio_type.lower(),
-            "portfolio_id": [portfolio_id]
-            if isinstance(portfolio_id, str)
-            else portfolio_id,
             "start_date": start_date,
             "end_date": end_date,
             "include_online_valuations": include_online_valuations,
             "include_unverified": include_unverified,
             "include_deleted": include_deleted,
         }
+        if portfolio_id is not None:
+            parameters["portfolio_id"] = (
+                [portfolio_id] if isinstance(portfolio_id, str) else portfolio_id
+            )
+        if external_ids is not None:
+            parameters["external_ids"] = external_ids
         if filters is not None:
             parameters["filters"] = filters
         if sorting is not None:
@@ -140,9 +152,9 @@ class TransactionJobsResource(JobResource):
         self,
         columns: list[str],
         portfolio_type: PortfolioType,
-        portfolio_id: str | list[str],
-        start_date: str,
-        end_date: str,
+        portfolio_id: str | int | list[str | int] | None = None,
+        start_date: str | None = None,
+        end_date: str | None = None,
         *,
         filters: list[dict[str, Any]] | None = None,
         sorting: list[dict[str, Any]] | None = None,
@@ -150,6 +162,7 @@ class TransactionJobsResource(JobResource):
         include_online_valuations: bool = False,
         include_unverified: bool = False,
         include_deleted: bool = False,
+        external_ids: list[dict[str, str]] | None = None,
         initial_wait: float = DEFAULT_INITIAL_WAIT,
         max_wait: float = DEFAULT_MAX_WAIT,
         backoff_factor: float = DEFAULT_BACKOFF_FACTOR,
@@ -172,6 +185,7 @@ class TransactionJobsResource(JobResource):
                 include_online_valuations=include_online_valuations,
                 include_unverified=include_unverified,
                 include_deleted=include_deleted,
+                external_ids=external_ids,
             ),
             initial_wait=initial_wait,
             max_wait=max_wait,
@@ -181,3 +195,13 @@ class TransactionJobsResource(JobResource):
 
     execute_transaction_query = JobResource.execute_job
     execute_transaction_query_job = JobResource.execute_job
+
+    def get_job_creator(self, job_id: str) -> dict[str, Any]:
+        """Get the user who created a transaction export job."""
+        return self._get(f"/transaction_jobs/{job_id}/creator").json().get("data", {})
+
+    def get_job_creator_relationship(self, job_id: str) -> dict[str, Any]:
+        """Get creator linkage containing the user ID and resource type."""
+        return self._get(
+            f"/transaction_jobs/{job_id}/relationships/creator"
+        ).json().get("data", {})

@@ -14,6 +14,7 @@ CLAUDE.md
 htmlcov/
 test-results/
 live-queries/
+addepar-api-docs/
 
 # Build artifacts
 dist/

@@ -27,9 +27,12 @@ class AuditResource(BaseResource):
     """
     Resource for Addepar Audit API.
 
-    Audit logs track changes to attribute values, transactions, reports,
-    and user roles/permissions. Each entry represents an addition,
-    modification, or deletion.
+    Audit logs track changes to attribute values, transactions,
+    and user roles/permissions. Report history is available only in the
+    application. Each entry represents an addition, modification, or deletion.
+
+    Omit both dates to use the API's current-day default, or provide one
+    date to use that date for both bounds. Timestamp ranges require both dates.
 
     Methods:
         - get_audit_entry() - Get a specific audit log entry by ID
@@ -42,8 +45,8 @@ class AuditResource(BaseResource):
     def _query_audit_logs(
         self,
         object_type: AuditObjectType,
-        start_date: str,
-        end_date: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         *,
         actions: Optional[List[AuditAction]] = None,
         user_type: Optional[AuditUserType] = None,
@@ -65,11 +68,12 @@ class AuditResource(BaseResource):
         Returns:
             List of audit log entries.
         """
-        attributes: Dict[str, Any] = {
-            "object_type": object_type,
-            "start_date": start_date,
-            "end_date": end_date,
-        }
+        attributes: Dict[str, Any] = {"object_type": object_type}
+
+        if start_date is not None:
+            attributes["start_date"] = start_date
+        if end_date is not None:
+            attributes["end_date"] = end_date
 
         if actions is not None:
             attributes["actions"] = actions
@@ -115,9 +119,10 @@ class AuditResource(BaseResource):
 
     def query_login_attempts(
         self,
-        start_date: str,
-        end_date: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         *,
+        actions: Optional[List[AuditAction]] = None,
         user_type: Optional[AuditUserType] = None,
         users: Optional[List[str]] = None,
         page_limit: int = DEFAULT_PAGE_LIMIT,
@@ -132,6 +137,7 @@ class AuditResource(BaseResource):
         Args:
             start_date: Start date (YYYY-MM-DD or ISO 8601 with timezone).
             end_date: End date (YYYY-MM-DD or ISO 8601 with timezone).
+            actions: Optional action filter; login attempts support "Add".
             user_type: Who to include (firmusers, addeparusers, anyone, custom).
             users: List of user IDs (when user_type="custom").
             page_limit: Results per page (default: 500, max: 2000).
@@ -149,6 +155,7 @@ class AuditResource(BaseResource):
             object_type="login_attempt",
             start_date=start_date,
             end_date=end_date,
+            actions=actions,
             user_type=user_type,
             users=users,
             page_limit=page_limit,
@@ -158,8 +165,8 @@ class AuditResource(BaseResource):
 
     def query_attribute_changes(
         self,
-        start_date: str,
-        end_date: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         *,
         actions: Optional[List[AuditAction]] = None,
         user_type: Optional[AuditUserType] = None,
@@ -204,8 +211,8 @@ class AuditResource(BaseResource):
 
     def query_transaction_changes(
         self,
-        start_date: str,
-        end_date: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         *,
         actions: Optional[List[AuditAction]] = None,
         user_type: Optional[AuditUserType] = None,
@@ -250,8 +257,8 @@ class AuditResource(BaseResource):
 
     def query_permission_changes(
         self,
-        start_date: str,
-        end_date: str,
+        start_date: Optional[str] = None,
+        end_date: Optional[str] = None,
         *,
         actions: Optional[List[AuditAction]] = None,
         user_type: Optional[AuditUserType] = None,

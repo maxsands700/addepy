@@ -44,6 +44,7 @@ class ReportsResource(BaseResource):
         name: Optional[str] = None,
         entity_id: Optional[str] = None,
         group_id: Optional[str] = None,
+        page_after: Optional[Union[str, int]] = None,
         limit: Optional[int] = None,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> Generator[Dict[str, Any], None, None]:
@@ -58,8 +59,9 @@ class ReportsResource(BaseResource):
             name: Filter by report name (substring match).
             entity_id: Filter by associated entity ID.
             group_id: Filter by associated group ID.
+            page_after: Return reports after this report ID.
             limit: Maximum number of items to yield. None means no limit.
-            page_limit: Results per page (default: 500, max: 2000).
+            page_limit: Results per page, capped at the API maximum of 500.
 
         Yields:
             Individual report resource objects.
@@ -80,8 +82,16 @@ class ReportsResource(BaseResource):
             params["filter[entityId]"] = entity_id
         if group_id is not None:
             params["filter[groupId]"] = group_id
+        if page_after is not None:
+            params["page[after]"] = page_after
 
-        return self._paginate("/reports", page_limit=page_limit, params=params if params else None, max_items=limit)
+        return self._paginate(
+            "/reports",
+            page_limit=min(page_limit, 500),
+            params=params or None,
+            max_items=limit,
+            cursor_parameter="page[after]",
+        )
 
     def list_reports(
         self,
@@ -93,6 +103,7 @@ class ReportsResource(BaseResource):
         name: Optional[str] = None,
         entity_id: Optional[str] = None,
         group_id: Optional[str] = None,
+        page_after: Optional[Union[str, int]] = None,
         limit: int = DEFAULT_LIST_LIMIT,
         page_limit: int = DEFAULT_PAGE_LIMIT,
     ) -> List[Dict[str, Any]]:
@@ -107,9 +118,10 @@ class ReportsResource(BaseResource):
             name: Filter by report name (substring match).
             entity_id: Filter by associated entity ID.
             group_id: Filter by associated group ID.
+            page_after: Return reports after this report ID.
             limit: Maximum number of items to return (default: 10,000).
                 Use iter_reports() for full results or pass a higher limit.
-            page_limit: Results per page (default: 500, max: 2000).
+            page_limit: Results per page, capped at the API maximum of 500.
 
         Returns:
             List of report resource objects containing id, type, and attributes
@@ -124,6 +136,7 @@ class ReportsResource(BaseResource):
             name=name,
             entity_id=entity_id,
             group_id=group_id,
+            page_after=page_after,
             limit=limit,
             page_limit=page_limit,
         ))

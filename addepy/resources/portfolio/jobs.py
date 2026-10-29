@@ -218,3 +218,11 @@ class JobsResource(JobResource):
         )
 
     execute_portfolio_view = execute_view_job
+
+    def get_job_creator(self, job_id: str) -> dict[str, Any]:
+        """Get the user resource identified by the job's creator relationship."""
+        return self._get(f"/jobs/{job_id}/creator").json().get("data", {})
+
+    def get_job_creator_relationship(self, job_id: str) -> dict[str, Any]:
+        """Get creator linkage containing the user ID and resource type."""
+        return self._get(f"/jobs/{job_id}/relationships/creator").json().get("data", {})

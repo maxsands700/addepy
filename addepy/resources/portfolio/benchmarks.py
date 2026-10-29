@@ -97,12 +97,12 @@ class BenchmarksResource(BaseResource):
 
         Args:
             limit: Maximum number of items to yield. None means no limit.
-            page_limit: Results per page (default: 500, max: 2000).
+            page_limit: Results per page (default: 500, max: 500).
 
         Yields:
             Individual benchmark resource objects.
         """
-        return self._paginate("/benchmarks", page_limit=page_limit, max_items=limit)
+        return self._paginate("/benchmarks", page_limit=min(page_limit, 500), max_items=limit)
 
     def list_benchmarks(
         self,
@@ -116,7 +116,7 @@ class BenchmarksResource(BaseResource):
         Args:
             limit: Maximum number of items to return (default: 10,000).
                 Use iter_benchmarks() for unbounded iteration.
-            page_limit: Results per page (default: 500, max: 2000).
+            page_limit: Results per page (default: 500, max: 500).
 
         Returns:
             List of benchmark resource objects.
@@ -557,7 +557,7 @@ class BenchmarksResource(BaseResource):
         Yields:
             Individual strategy resource objects.
         """
-        return self._paginate("/benchmark_associations_strategies", page_limit=page_limit, max_items=limit)
+        return self._paginate("/benchmark_associations_strategies", page_limit=min(page_limit, 500), max_items=limit)
 
     def list_benchmark_association_strategies(
         self,

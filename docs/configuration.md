@@ -1,7 +1,5 @@
 # Configuration
 
-Use a context manager to close the client's connections when finished:
-
 ```python
 from addepy import AddePy
 
@@ -9,47 +7,53 @@ with AddePy.from_dotenv(".env") as client:
     user = client.admin.users.get_current_user()
 ```
 
-## Configuration sources
+## Sources
 
-| Factory | Reads |
+| Construction | Reads |
 | --- | --- |
-| `AddePy.from_dotenv(".env")` | Exactly that file; relative paths start at the working directory. Works without Git. |
-| `AddePy.from_dotenv()` | The nearest ancestor Git repository's root `.env`, starting at the working directory. |
-| `AddePy.from_env()` | Process `ADDEPAR_*` variables only. |
-| `AddePy(...)` | Explicit constructor arguments only. |
+| `AddePy.from_dotenv(path, **overrides)` | Exactly that file; relative to working directory; Git optional. |
+| `AddePy.from_dotenv(**overrides)` | Nearest ancestor Git repository's root `.env`, starting at working directory. |
+| `AddePy.from_env(**overrides)` | Process `ADDEPAR_*` variables. |
+| `AddePy(...)` | Explicit arguments. |
 
-A missing file or repository raises `FileNotFoundError`. File loading does not merge process variables, expand `${VARIABLE}` references, or change the process environment. Keyword arguments override source values:
+Missing file/repository: `FileNotFoundError`. File loading neither merges process
+values nor interpolates `${VARIABLE}` nor mutates the environment. Overrides
+replace source values. Any authentication override replaces the entire source
+authentication method; supply both key fields together.
+
+## Settings
+
+Use [`.env.example`](../.env.example). Require `firm_id` and either `firm_name`
+or `base_url`. Supply exactly one authentication method.
+
+| Constructor argument | File/process variable | Meaning/default |
+| --- | --- | --- |
+| `firm_id` | `ADDEPAR_FIRM_ID` | Firm header; required. |
+| `firm_name` | `ADDEPAR_FIRM_NAME` | Hostname prefix. |
+| `environment` | `ADDEPAR_ENVIRONMENT` | `production` (default), `sandbox`, `development`. |
+| `base_url` | `ADDEPAR_BASE_URL` | Explicit HTTPS API URL including version; overrides hostname construction. |
+| `key_id`, `key_secret` | `ADDEPAR_KEY_ID`, `ADDEPAR_KEY_SECRET` | Raw Basic key pair; SDK encodes it. |
+| `api_key` | `ADDEPAR_API_KEY` | Base64 `key_id:key_secret`; optional `Basic ` prefix. |
+| `access_token` | `ADDEPAR_ACCESS_TOKEN` | Bearer token; optional `Bearer ` prefix. |
+| `token_provider` | — | Callable returning an access token; alternative authentication. |
+| `timeout` | — | `(10, 60)` seconds: connect/read; positive scalar also accepted. |
+| `max_retries`, `max_retry_wait` | — | `2` retries, maximum delay `60` seconds. |
+| `session`, `download_session` | — | Optional Requests sessions; caller owns injected sessions. |
+
+Constructed URLs end in `/api/v1`: production `{firm_name}.addepar.com`, sandbox
+`{firm_name}.sandbox.addepar.com`, development `{firm_name}.clientdev.addepar.com`.
+Use `base_url="https://api.addepar.com/v1"` for an explicitly configured global host.
 
 ```python
 client = AddePy.from_dotenv(".env", timeout=(10, 90), max_retries=0)
 client.close()
 ```
 
-## Credentials and environments
-
-Start with [`.env.example`](../.env.example). Set `ADDEPAR_FIRM_ID` and either `ADDEPAR_FIRM_NAME` or a full `ADDEPAR_BASE_URL`. Choose exactly one authentication method:
-
-| File/process variables | Constructor arguments | Meaning |
-| --- | --- | --- |
-| `ADDEPAR_KEY_ID` and `ADDEPAR_KEY_SECRET` | `key_id`, `key_secret` | Raw Basic key pair; SDK performs base64 encoding. |
-| `ADDEPAR_API_KEY` | `api_key` | Already base64-encoded `key_id:key_secret`, optionally prefixed with `Basic `. |
-| `ADDEPAR_ACCESS_TOKEN` | `access_token` | OAuth access token, optionally prefixed with `Bearer `. |
-
-An authentication keyword override replaces the entire authentication method from the source. Supply both key fields when overriding a key pair.
-
-`ADDEPAR_ENVIRONMENT` / `environment` defaults to `production`:
-
-| Environment | Constructed API base URL |
-| --- | --- |
-| `production` | `https://{firm_name}.addepar.com/api/v1` |
-| `sandbox` | `https://{firm_name}.sandbox.addepar.com/api/v1` |
-| `development` | `https://{firm_name}.clientdev.addepar.com/api/v1` |
-
-Use the environment provisioned for your firm. `ADDEPAR_BASE_URL` / `base_url` overrides hostname construction; include the API version, for example `https://yourfirm.addepar.com/api/v1`. API URLs require HTTPS.
-
 ## OAuth refresh
 
-For automatic refresh, supply an `OAuthTokenProvider` as `token_provider=`. Register and authorize the OAuth application separately. The provider uses the token response's `expires_in` and calls `on_token_update` with refreshed tokens so your application can persist rotated refresh tokens.
+Register/authorize the application separately. `OAuthTokenProvider` posts a
+refresh grant to the supplied `token_url`, uses returned `expires_in`, and calls
+`on_token_update(tokens)` after refresh so the application can persist rotation.
 
 ```python
 import os
@@ -65,12 +69,11 @@ with OAuthTokenProvider(
         user = client.admin.users.get_current_user()
 ```
 
-Use your application's token endpoint for the selected environment. These `OAUTH_*` names are application settings used by the example; the SDK factories only read the `ADDEPAR_*` settings above.
+These `OAUTH_*` names belong to the example; factories read only the table's
+`ADDEPAR_*` names. Provider options: `access_token=None`, `expires_in=0`,
+`timeout=30`, `session=None`, `on_token_update=None`. Calling the provider or
+`get_token(deadline=None)` returns a token; the optional deadline is monotonic.
+`close()`/context exit closes only its owned session.
 
-## HTTP behavior
-
-The default request timeout is `(10, 60)` seconds for connection and read respectively. Transient read failures can retry twice; set `max_retries=0` to disable retries. Writes require explicit `retry=True` on `client.request(...)` and a body that can be replayed. A server retry delay above `max_retry_wait` (default 60 seconds) raises the original error instead of retrying early.
-
-SDK request exceptions inherit from `AddePyError` and expose `status_code`, `request_id`, `errors`, and `response` when available. HTTP error messages omit response bodies. Connection failures raise `TransportError`; request timeouts raise `RequestTimeoutError`. See [jobs](jobs.md) for polling deadlines and job failures.
-
-Pass a `requests.Session` as `session=` to customize connections; injected sessions remain caller-owned. Cross-host download redirects strip API credentials, firm headers, and cookies. Polling deadlines also bound SDK-managed requests, retries, and OAuth refresh. Stream read timeouts limit inactivity, not total download duration.
+Implementation: [client.py](../addepy/client.py),
+[configuration.py](../addepy/configuration.py), [auth.py](../addepy/auth.py).

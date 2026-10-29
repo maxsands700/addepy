@@ -2,6 +2,22 @@
 
 All notable changes to this project will be documented in this file.
 
+## [1.1.0] - 2026-10-29
+
+### Added
+- `client.billing` owns fees, fee schedules, billable portfolios, payout recipients, and payout rules.
+- Transaction destination and relationship lookups, attachment retrieval, and file association/removal methods.
+- Creator resource and relationship lookups for portfolio and transaction jobs.
+- Billing read expansions and complete-document/page access, snapshot knowledge dates, transaction destination relationships, external-ID query scopes, optional audit dates/action filters, and additional file filters.
+- Import support for `BENCHMARK_PROXIES` and `CONSTITUENT_ATTRIBUTES`, and `node_fee` transaction type hints.
+
+### Changed
+- Removed billing properties and resource exports from `client.admin`; use `client.billing` and imports from `addepy.resources.billing`.
+- Fee schedule creation now sends a JSON:API array. Billing validates documented batch sizes, fee schedule associations, and read-only fee relationships.
+- Snapshot single updates send explicit `None` as JSON null; omitted fields remain unchanged. Snapshot creation permits omitted units for assets that do not require them.
+- Synchronous portfolio query grouping strings become attribute objects. Report and benchmark pagination respect resource-specific limits.
+- Portfolio query-job submission, polling, completion detection, and downloads remain unchanged.
+
 ## [1.0.0] - 2026-10-28
 
 First stable release of AddePy.
@@ -40,7 +56,7 @@ First stable release of AddePy.
 - File uploads use the shared authenticated transport.
 - README method aliases and package version metadata are consistent.
 
-See [migration](MIGRATION.md), [resources](docs/resources.md), and [development](docs/development.md) for upgrade instructions, API usage, and testing.
+See [SDK documentation](docs/README.md) and [development](docs/development.md) for API usage and testing.
 
 ## [0.2.0] - 2025-12-12
 

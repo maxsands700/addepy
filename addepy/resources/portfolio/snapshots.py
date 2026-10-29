@@ -11,6 +11,14 @@ logger = logging.getLogger("addepy")
 SNAPSHOT_TYPES = {"snapshot", "valuation"}
 
 
+class _Unset:
+    def __repr__(self) -> str:
+        return "UNSET"
+
+
+_UNSET = _Unset()
+
+
 class SnapshotsResource(BaseResource):
     """
     Resource for Addepar Snapshots API.
@@ -70,33 +78,35 @@ class SnapshotsResource(BaseResource):
         comment: Optional[str] = None,
         price_factor: Optional[float] = None,
         accrued_income_per_unit: Optional[float] = None,
+        knowledge_date: Optional[str] = None,
     ) -> Dict[str, Any]:
         """
         Create a single snapshot or valuation.
 
         Args:
-            snapshot_type: Either "snapshot" (share-based) or "valuation" (value-based).
+            snapshot_type: Either "snapshot" (share/percent-based) or "valuation" (value-based).
             currency: Three-letter currency code (e.g., "USD").
             trade_date: Date string in "YYYY-MM-DD" format.
             amount: The value of the snapshot/valuation.
             owner_id: Entity ID of the owner.
             owned_id: Entity ID of the owned asset.
-            units: Number of shares. Required for snapshots, not for valuations.
+            units: Number of shares. Required by Addepar for share-based assets;
+                omit for percent-based snapshots or valuations.
             comment: Optional description (max 4000 characters).
             price_factor: Principal factor for bonds.
             accrued_income_per_unit: Accrued income per unit.
+            knowledge_date: When the value was known or reported (YYYY-MM-DD).
+                Distinguishes values with the same position and trade date.
 
         Returns:
             The created snapshot resource object.
 
         Raises:
-            ValueError: If snapshot_type is invalid or units missing for snapshot.
+            ValueError: If snapshot_type is invalid. Addepar validates asset-specific
+                requirements, including whether units are required.
         """
         if snapshot_type not in SNAPSHOT_TYPES:
             raise ValueError(f"snapshot_type must be one of: {SNAPSHOT_TYPES}")
-
-        if snapshot_type == "snapshot" and units is None:
-            raise ValueError("units is required for snapshot type")
 
         attributes: Dict[str, Any] = {
             "type": snapshot_type,
@@ -113,6 +123,8 @@ class SnapshotsResource(BaseResource):
             attributes["price_factor"] = price_factor
         if accrued_income_per_unit is not None:
             attributes["accrued_income_per_unit"] = accrued_income_per_unit
+        if knowledge_date is not None:
+            attributes["knowledge_date"] = knowledge_date
 
         payload = {
             "data": [
@@ -150,10 +162,11 @@ class SnapshotsResource(BaseResource):
                 - amount (float): Value. Required.
                 - owner_id (str): Owner entity ID. Required.
                 - owned_id (str): Owned entity ID. Required.
-                - units (float, optional): Required for snapshots.
+                - units (float, optional): Required for share-based assets.
                 - comment (str, optional): Description.
                 - price_factor (float, optional): For bonds.
                 - accrued_income_per_unit (float, optional): Accrued income.
+                - knowledge_date (str, optional): When the value was known/reported.
 
         Returns:
             List of created snapshot resource objects.
@@ -180,6 +193,8 @@ class SnapshotsResource(BaseResource):
             ]
             created = client.portfolio.snapshots.create_snapshots(snapshots)
         """
+        if not 1 <= len(snapshots) <= 500:
+            raise ValueError("snapshots must contain between 1 and 500 items")
         data_items = []
         for snap in snapshots:
             snapshot_type = snap.get("snapshot_type", "snapshot")
@@ -201,6 +216,8 @@ class SnapshotsResource(BaseResource):
                 attributes["price_factor"] = snap["price_factor"]
             if "accrued_income_per_unit" in snap:
                 attributes["accrued_income_per_unit"] = snap["accrued_income_per_unit"]
+            if "knowledge_date" in snap:
+                attributes["knowledge_date"] = snap["knowledge_date"]
 
             data_items.append({
                 "type": "snapshots",
@@ -227,18 +244,19 @@ class SnapshotsResource(BaseResource):
         self,
         snapshot_id: str,
         *,
-        amount: Optional[float] = None,
-        currency: Optional[str] = None,
-        units: Optional[float] = None,
-        comment: Optional[str] = None,
-        price_factor: Optional[float] = None,
-        accrued_income_per_unit: Optional[float] = None,
+        amount: float | None | _Unset = _UNSET,
+        currency: str | None | _Unset = _UNSET,
+        units: float | None | _Unset = _UNSET,
+        comment: str | None | _Unset = _UNSET,
+        price_factor: float | None | _Unset = _UNSET,
+        accrued_income_per_unit: float | None | _Unset = _UNSET,
     ) -> Dict[str, Any]:
         """
         Update a single snapshot or valuation.
 
-        Note: Cannot update type, trade_date, owner, owned, or position.
-        To remove an attribute, set it to None (will be sent as null).
+        Note: Cannot update type, trade_date, knowledge_date, owner, owned, or position.
+        Omitted attributes remain unchanged. Explicit None is sent as JSON null
+        to remove an editable attribute.
 
         Args:
             snapshot_id: The ID of the snapshot to update.
@@ -254,17 +272,17 @@ class SnapshotsResource(BaseResource):
         """
         attributes: Dict[str, Any] = {}
 
-        if amount is not None:
+        if amount is not _UNSET:
             attributes["amount"] = amount
-        if currency is not None:
+        if currency is not _UNSET:
             attributes["currency"] = currency
-        if units is not None:
+        if units is not _UNSET:
             attributes["units"] = units
-        if comment is not None:
+        if comment is not _UNSET:
             attributes["comment"] = comment
-        if price_factor is not None:
+        if price_factor is not _UNSET:
             attributes["price_factor"] = price_factor
-        if accrued_income_per_unit is not None:
+        if accrued_income_per_unit is not _UNSET:
             attributes["accrued_income_per_unit"] = accrued_income_per_unit
 
         payload = {
@@ -305,6 +323,8 @@ class SnapshotsResource(BaseResource):
             ]
             updated = client.portfolio.snapshots.update_snapshots(updates)
         """
+        if not 1 <= len(snapshots) <= 500:
+            raise ValueError("snapshots must contain between 1 and 500 items")
         data_items = []
         for snap in snapshots:
             attributes: Dict[str, Any] = {}
@@ -353,6 +373,8 @@ class SnapshotsResource(BaseResource):
         Args:
             snapshot_ids: List of snapshot IDs to delete.
         """
+        if not 1 <= len(snapshot_ids) <= 500:
+            raise ValueError("snapshot_ids must contain between 1 and 500 items")
         payload = {
             "data": [
                 {"id": snapshot_id, "type": "snapshots"}

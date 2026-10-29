@@ -1,7 +1,7 @@
 """Offline request contracts transcribed from the linked Addepar guides.
 
 These check SDK behavior against documentation, not server availability.
-See docs/resources.md for investment resource conventions.
+See docs/portfolio.md for investment resource conventions.
 """
 
 from collections import deque

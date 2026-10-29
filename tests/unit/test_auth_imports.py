@@ -7,7 +7,7 @@ from unittest.mock import Mock
 import pytest
 import requests
 
-from addepy import AddePy, AuthenticationError, OAuthTokenProvider
+from addepy import AddePy, AuthenticationError, OAuthTokenProvider, ValidationError
 from addepy.resources.admin.import_tool import ImportToolResource
 
 
@@ -133,7 +133,13 @@ def test_invalid_import_input_never_sends(data):
 
 
 @pytest.mark.parametrize(
-    "import_type,method", [("ATTRIBUTES", "POST"), ("DELETE_TRANSACTIONS", "DELETE")]
+    "import_type,method",
+    [
+        ("ATTRIBUTES", "POST"),
+        ("BENCHMARK_PROXIES", "POST"),
+        ("CONSTITUENT_ATTRIBUTES", "POST"),
+        ("DELETE_TRANSACTIONS", "DELETE"),
+    ],
 )
 def test_import_creation_requests_json_and_sends_plain_text(import_type, method):
     session = Mock(spec=requests.Session)
@@ -154,6 +160,13 @@ def test_import_creation_requests_json_and_sends_plain_text(import_type, method)
         "is_dry_run": "true",
         "ignore_warnings": "false",
     }
+
+
+def test_unknown_import_type_still_rejected_before_request():
+    client = Mock()
+    with pytest.raises(ValidationError, match="Invalid import_type"):
+        ImportToolResource(client).create_import("a,b\n1,2\n", "UNKNOWN_IMPORT")
+    client._request.assert_not_called()
 
 
 @pytest.mark.parametrize(

@@ -11,6 +11,7 @@ import pytest
         "addepy",
         "addepy.resources",
         "addepy.resources.admin",
+        "addepy.resources.billing",
         "addepy.resources.portfolio",
         "addepy.resources.ownership",
     ],

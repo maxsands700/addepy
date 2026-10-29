@@ -17,6 +17,7 @@ from .transport import Transport, raise_api_error
 
 if TYPE_CHECKING:
     from .resources.admin import AdminNamespace
+    from .resources.billing import BillingNamespace
     from .resources.ownership import OwnershipNamespace
     from .resources.portfolio import PortfolioNamespace
 
@@ -121,6 +122,7 @@ class AddePy:
         self._session = self._transport.session
         self._portfolio: Optional["PortfolioNamespace"] = None
         self._admin: Optional["AdminNamespace"] = None
+        self._billing: Optional["BillingNamespace"] = None
         self._ownership: Optional["OwnershipNamespace"] = None
 
     @classmethod
@@ -170,6 +172,15 @@ class AddePy:
 
             self._admin = AdminNamespace(self)
         return self._admin
+
+    @property
+    def billing(self) -> "BillingNamespace":
+        """Access fees, fee schedules, billable portfolios, and payouts."""
+        if self._billing is None:
+            from .resources.billing import BillingNamespace
+
+            self._billing = BillingNamespace(self)
+        return self._billing
 
     @property
     def ownership(self) -> "OwnershipNamespace":

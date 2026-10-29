@@ -50,18 +50,45 @@ class FilesResource(BaseResource):
     # CRUD Methods
     # =========================================================================
 
-    def get_file(self, file_id: str) -> Dict[str, Any]:
+    def get_file(
+        self,
+        file_id: str,
+        *,
+        created_after: Optional[str] = None,
+        created_before: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        group_id: Optional[str] = None,
+        included_objects: Optional[str] = None,
+        parent_folder_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
         Get a single file or folder by ID.
 
         Args:
             file_id: The ID of the file or folder to retrieve.
+            created_after: Files created after date (ISO 8601).
+            created_before: Files created before date (ISO 8601).
+            entity_id: Filter by associated entity ID.
+            group_id: Filter by associated group ID; ignored when entity_id is set.
+            included_objects: FILES_ONLY, FOLDERS_ONLY, or FILES_AND_FOLDERS.
+            parent_folder_id: Filter by parent folder ID.
 
         Returns:
             The file resource object containing id, type, attributes,
             and relationships.
         """
-        response = self._get(f"/files/{file_id}")
+        params: Dict[str, Any] = {}
+        for key, value in (
+            ("createdAfter", created_after),
+            ("createdBefore", created_before),
+            ("entityId", entity_id),
+            ("groupId", group_id),
+            ("includedObjects", included_objects),
+            ("parentFolderId", parent_folder_id),
+        ):
+            if value is not None:
+                params[f"filter[files][{key}]"] = value
+        response = self._get(f"/files/{file_id}", params=params or None)
         data = response.json()
         file = data.get("data", {})
         logger.debug(f"Retrieved file {file_id}")
@@ -343,6 +370,8 @@ class FilesResource(BaseResource):
         *,
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        group_id: Optional[str] = None,
         included_objects: Optional[str] = None,
         parent_folder_id: Optional[str] = None,
         limit: Optional[int] = None,
@@ -354,6 +383,8 @@ class FilesResource(BaseResource):
         Args:
             created_after: Files created after date (ISO 8601).
             created_before: Files created before date (ISO 8601).
+            entity_id: Filter by associated entity ID.
+            group_id: Filter by associated group ID; ignored when entity_id is set.
             included_objects: What to include - "FILES_ONLY", "FOLDERS_ONLY",
                 or "FILES_AND_FOLDERS".
             parent_folder_id: Filter by parent folder ID.
@@ -369,6 +400,10 @@ class FilesResource(BaseResource):
             params["filter[files][createdAfter]"] = created_after
         if created_before is not None:
             params["filter[files][createdBefore]"] = created_before
+        if entity_id is not None:
+            params["filter[files][entityId]"] = entity_id
+        if group_id is not None:
+            params["filter[files][groupId]"] = group_id
         if included_objects is not None:
             params["filter[files][includedObjects]"] = included_objects
         if parent_folder_id is not None:
@@ -381,6 +416,8 @@ class FilesResource(BaseResource):
         *,
         created_after: Optional[str] = None,
         created_before: Optional[str] = None,
+        entity_id: Optional[str] = None,
+        group_id: Optional[str] = None,
         included_objects: Optional[str] = None,
         parent_folder_id: Optional[str] = None,
         limit: int = DEFAULT_LIST_LIMIT,
@@ -392,6 +429,8 @@ class FilesResource(BaseResource):
         Args:
             created_after: Files created after date (ISO 8601).
             created_before: Files created before date (ISO 8601).
+            entity_id: Filter by associated entity ID.
+            group_id: Filter by associated group ID; ignored when entity_id is set.
             included_objects: What to include - "FILES_ONLY" (default),
                 "FOLDERS_ONLY", or "FILES_AND_FOLDERS".
             parent_folder_id: Filter by parent folder ID.
@@ -405,6 +444,8 @@ class FilesResource(BaseResource):
         files = list(self.iter_archived_files(
             created_after=created_after,
             created_before=created_before,
+            entity_id=entity_id,
+            group_id=group_id,
             included_objects=included_objects,
             parent_folder_id=parent_folder_id,
             limit=limit,

@@ -4,7 +4,7 @@ from typing import Any, Dict, Generator, List, Mapping, Optional, Sequence
 
 from ...constants import DEFAULT_LIST_LIMIT, DEFAULT_PAGE_LIMIT
 from ..base import BaseResource
-from .billing import _bulk_data, _resource, _single_data
+from .fees import _bulk_data, _resource, _single_data
 
 
 class _PayoutResource(BaseResource):
